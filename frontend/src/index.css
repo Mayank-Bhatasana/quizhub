@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+@theme{
+    --tw-bg-opacity: 1;
+    --color-primary:rgb(59 130 246 / var(--tw-bg-opacity));
+    --default-font-family: cursive;
+}
