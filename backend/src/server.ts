@@ -4,15 +4,38 @@ import cors from "cors";
 import swaggerUi from "swagger-ui-express";
 import { prisma } from "./lib/prisma.js";
 import openapi from "../openapi.json" with { type: "json" };
-
+import { createServer } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 const app = express();
 
-const allowedOrigins = ["http://localhost:5173"];
+const allowedOrigins = new Set([
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:4173",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  "http://127.0.0.1:4173",
+  "*",
+]);
+
+
+const isAllowedOrigin = (origin?: string) => {
+  if (!origin) return true;
+  if (allowedOrigins.has(origin)) return true;
+  try {
+    const url = new URL(origin);
+    const isLocalhost = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    const isHttp = url.protocol === "http:" || url.protocol === "https:";
+    return isLocalhost && isHttp;
+  } catch {
+    return false;
+  }
+};
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
@@ -22,6 +45,76 @@ app.use(
   }),
 );
 app.use(express.json());
+
+
+
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
+const roomSubscribers = new Map<string, Set<WebSocket>>();
+
+const subscribeToRoom = (code: string, ws: WebSocket) => {
+  const roomCode = code.trim().toUpperCase();
+  if (!roomCode) return;
+
+  let subscribers = roomSubscribers.get(roomCode);
+  if (!subscribers) {
+    subscribers = new Set<WebSocket>();
+    roomSubscribers.set(roomCode, subscribers);
+  }
+
+  subscribers.add(ws);
+};
+
+const unsubscribeSocket = (ws: WebSocket) => {
+  for (const [roomCode, subscribers] of roomSubscribers.entries()) {
+    subscribers.delete(ws);
+    if (subscribers.size === 0) {
+      roomSubscribers.delete(roomCode);
+    }
+  }
+};
+
+const publishToRoom = (code: string, payload: unknown) => {
+  const roomCode = code.trim().toUpperCase();
+  if (!roomCode) return;
+
+  const subscribers = roomSubscribers.get(roomCode);
+  if (!subscribers || subscribers.size === 0) return;
+
+  const message = JSON.stringify(payload);
+  for (const socket of subscribers) {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(message);
+    }
+  }
+};
+
+wss.on("connection", (ws) => {
+  ws.on("message", (raw) => {
+    let payload: unknown;
+    try {
+      payload = JSON.parse(String(raw));
+    } catch {
+      return;
+    }
+
+    if (!payload || typeof payload !== "object") {
+      return;
+    }
+
+    const message = payload as Record<string, unknown>;
+    if (message.type !== "subscribe" || typeof message.code !== "string") {
+      return;
+    }
+
+    subscribeToRoom(message.code, ws);
+  });
+
+  ws.on("close", () => {
+    unsubscribeSocket(ws);
+  });
+});
+app.get("/health", (req, res) => res.json({ status: "ok" }));
 
 const GUEST_COOKIE_NAME = "quiz_guest";
 const ROOM_CODE_LENGTH = 6;
@@ -49,9 +142,8 @@ const generateRoomCode = () => {
 
 const setGuestCookie = (res: express.Response, token: string) => {
   const isProd = process.env.NODE_ENV === "production";
-  const cookie = `${GUEST_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax${
-    isProd ? "; Secure" : ""
-  }`;
+  const cookie = `${GUEST_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax${isProd ? "; Secure" : ""
+    }`;
   res.setHeader("Set-Cookie", cookie);
 };
 
@@ -101,6 +193,10 @@ app.post("/api/guest", async (req, res) => {
     typeof req.body?.displayName === "string"
       ? req.body.displayName.trim()
       : "";
+  const avatarUrl =
+    typeof req.body?.avatarUrl === "string" && req.body.avatarUrl.trim()
+      ? req.body.avatarUrl.trim()
+      : null;
   if (!displayName) {
     return res.status(400).json({ error: "displayName is required" });
   }
@@ -111,6 +207,7 @@ app.post("/api/guest", async (req, res) => {
       username: displayName,
       isTemporary: true,
       guestToken,
+      avatarUrl,
     },
   });
 
@@ -250,6 +347,126 @@ app.post("/api/rooms/:code/join", async (req, res) => {
   return res.json({ roomId: room.id, participant });
 });
 
+
+/**
+ * GET /api/rooms/:code/participants
+ * Returns all participants in a room.
+ */
+app.get("/api/rooms/:code/participants", async (req, res) => {
+  const { code } = req.params;
+
+  const room = await prisma.quizRoom.findUnique({ where: { code } });
+  if (!room) {
+    return res.status(404).json({ error: "Room not found" });
+  }
+
+  const participants = await prisma.roomParticipant.findMany({
+    where: { roomId: room.id },
+    orderBy: { joinedAt: "asc" },
+    include: {
+      profile: {
+        select: {
+          avatarUrl: true,
+        },
+      },
+    },
+  });
+
+  const payload = participants.map((participant) => ({
+    id: participant.id,
+    profileId: participant.profileId,
+    displayName: participant.displayName,
+    isHost: participant.isHost,
+    joinedAt: participant.joinedAt,
+    avatarUrl: participant.profile?.avatarUrl ?? null,
+  }));
+
+  return res.json({ participants: payload });
+});
+
+/**
+ * GET /api/rooms/:code
+ * Returns room details and question count.
+ */
+app.get("/api/rooms/:code", async (req, res) => {
+  const { code } = req.params;
+
+  const room = await prisma.quizRoom.findUnique({
+    where: { code },
+    include: {
+      questions: true,
+    },
+  });
+
+  if (!room) {
+    return res.status(404).json({ error: "Room not found" });
+  }
+
+  return res.json({
+    room: {
+      id: room.id,
+      code: room.code,
+      status: room.status,
+      hostId: room.hostId,
+      startedAt: room.startedAt,
+      questionCount: room.questions.length,
+    },
+  });
+});
+
+/**
+ * POST /api/rooms/:code/start
+ * Starts the quiz for a room (host only).
+ * Body: { profileId: string }
+ */
+app.post("/api/rooms/:code/start", async (req, res) => {
+  const { code } = req.params;
+  const { profileId } = req.body ?? {};
+
+  if (!profileId) {
+    return res.status(400).json({ error: "profileId is required" });
+  }
+
+  const room = await prisma.quizRoom.findUnique({ where: { code } });
+  if (!room) {
+    return res.status(404).json({ error: "Room not found" });
+  }
+
+  if (room.hostId !== profileId) {
+    return res.status(403).json({ error: "Only the host can start the quiz" });
+  }
+
+  if (room.status !== "LOBBY") {
+    return res.status(400).json({ error: "Room is not in LOBBY status" });
+  }
+
+  const updated = await prisma.quizRoom.update({
+    where: { id: room.id },
+    data: {
+      status: "LIVE",
+      startedAt: new Date(),
+    },
+  });
+
+  publishToRoom(updated.code, {
+    type: "room_started",
+    room: {
+      code: updated.code,
+      status: updated.status,
+      startedAt: updated.startedAt,
+    },
+  });
+
+  return res.json({
+    room: {
+      id: updated.id,
+      code: updated.code,
+      status: updated.status,
+      hostId: updated.hostId,
+      startedAt: updated.startedAt,
+    },
+  });
+});
 /**
  * POST /api/rooms/:roomId/answer
  * Submits an answer for a room question.
@@ -355,6 +572,6 @@ app.get("/api/rooms/:roomId/scoreboard", async (req, res) => {
   return res.json({ scoreboard });
 });
 
-app.listen(3000, () => {
+server.listen(3000, () => {
   console.log("Server running on port 3000");
 });

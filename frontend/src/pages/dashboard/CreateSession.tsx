@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createGuest, createQuestion, createRoom } from "../../services/quizApi";
+import { useCreateGuest, useCreateQuestion, useCreateRoom } from "../../query/queries";
 import { createTempUser, getTempUser, setTempUser, updateTempUser } from "../../utils/tempUser";
 
 type QuestionDraft = {
@@ -32,6 +32,9 @@ function createQuestionDraft(): QuestionDraft {
 
 export default function CreateSession() {
   const navigate = useNavigate();
+  const createGuestMutation = useCreateGuest();
+  const createQuestionMutation = useCreateQuestion();
+  const createRoomMutation = useCreateRoom();
   const [name, setName] = useState(() => getTempUser()?.name ?? "");
   const [questions, setQuestions] = useState<QuestionDraft[]>(() => [createQuestionDraft()]);
   const [status, setStatus] = useState<string | null>(null);
@@ -77,6 +80,11 @@ export default function CreateSession() {
     setQuestions((prev) => prev.filter((q) => q.id !== questionId));
   }
 
+  const isCreating =
+    createGuestMutation.isPending ||
+    createQuestionMutation.isPending ||
+    createRoomMutation.isPending;
+
   async function handleCreate() {
     setError(null);
     setStatus("Creating room...");
@@ -91,7 +99,10 @@ export default function CreateSession() {
     }
 
     try {
-      const guest = await createGuest(displayName);
+      const guest = await createGuestMutation.mutateAsync({
+        displayName,
+        avatarUrl: getTempUser()?.avatarUrl ?? null,
+      });
       const hostProfileId = guest.profile.id;
 
       const createdQuestions = [] as { questionId: string; points: number }[];
@@ -100,7 +111,7 @@ export default function CreateSession() {
           .map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect }))
           .filter((o) => o.text);
 
-        const result = await createQuestion({
+        const result = await createQuestionMutation.mutateAsync({
           createdById: hostProfileId,
           text: q.text.trim(),
           explanation: q.explanation.trim() || undefined,
@@ -111,13 +122,15 @@ export default function CreateSession() {
         createdQuestions.push({ questionId, points: q.points });
       }
 
-      const room = await createRoom({
+      const room = await createRoomMutation.mutateAsync({
         hostProfileId,
         questions: createdQuestions,
       });
 
       updateTempUser({ profileId: hostProfileId });
       setStatus("Room created. Redirecting...");
+      console.log(room.room);
+
       navigate(`/dashboard/session/${room.room.code}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create room";
@@ -248,10 +261,10 @@ export default function CreateSession() {
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button
             onClick={handleCreate}
-            disabled={!hasValidQuestions}
+            disabled={!hasValidQuestions || isCreating}
             className="rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-brand-300"
           >
-            Create room
+            {isCreating ? "Creating..." : "Create room"}
           </button>
         </div>
       </section>

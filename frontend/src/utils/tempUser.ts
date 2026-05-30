@@ -7,6 +7,7 @@ export type TempUser = {
   id: string;
   name: string;
   avatar: TempUserAvatar;
+  avatarUrl?: string;
   profileId?: string;
   participantId?: string;
 };
@@ -51,6 +52,10 @@ const bgPool = [
   "bg-rose-100",
   "bg-indigo-100",
 ];
+const avatarUrlPool = Array.from({ length: 15 }, (_, index) => {
+  const id = index + 1;
+  return `https://cciiiwclqnouqzbjqscs.supabase.co/storage/v1/object/public/defaults/${id}.png`;
+});
 
 function randomId() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
@@ -66,6 +71,7 @@ export function createTempUser(name: string): TempUser {
     id: randomId(),
     name: safeName,
     avatar: { emoji: pick(emojiPool), bg: pick(bgPool) },
+    avatarUrl: pick(avatarUrlPool),
   };
 }
 

@@ -12,6 +12,24 @@ export type GuestProfile = {
   updatedAt: string;
 };
 
+export type ParticipantsProfile = {
+  id: string;
+  profileId: string;
+  displayName: string;
+  isHost: boolean;
+  joinedAt: string;
+  avatarUrl: string | null;
+};
+
+export type RoomDetails = {
+  id: string;
+  code: string;
+  status: string;
+  hostId: string;
+  startedAt: string | null;
+  questionCount: number;
+};
+
 export type RoomParticipant = {
   id: string;
   displayName: string;
@@ -24,10 +42,10 @@ export type RoomResponse = {
   status: string;
 };
 
-export async function createGuest(displayName: string) {
+export async function createGuest(input: { displayName: string; avatarUrl?: string | null }) {
   return apiFetch<{ profile: GuestProfile }>("/api/guest", {
     method: "POST",
-    body: { displayName },
+    body: input,
   });
 }
 
@@ -61,6 +79,29 @@ export async function joinRoom(code: string, input: { profileId: string; display
       body: input,
     },
   );
+}
+
+export async function getAllTheParticipants(code: string) {
+  return apiFetch<{ participants: ParticipantsProfile[] }>(
+    `/api/rooms/${code}/participants`,
+    {
+      method: "GET",
+    }
+  )
+
+}
+
+export async function getRoomDetails(code: string) {
+  return apiFetch<{ room: RoomDetails }>(`/api/rooms/${code}`, {
+    method: "GET",
+  });
+}
+
+export async function startRoom(code: string, input: { profileId: string }) {
+  return apiFetch<{ room: RoomDetails }>(`/api/rooms/${code}/start`, {
+    method: "POST",
+    body: input,
+  });
 }
 
 export async function submitAnswer(roomId: string, input: {

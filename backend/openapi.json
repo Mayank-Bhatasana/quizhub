@@ -143,6 +143,32 @@
         }
       }
     },
+    "/api/rooms/{code}/participants": {
+      "get": {
+        "summary": "get the num of parametersi",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        
+        "responses": {
+          "200": {
+            "description": "Joined",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/JoinRoomResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/api/rooms/{roomId}/answer": {
       "post": {
         "summary": "Submit answer",

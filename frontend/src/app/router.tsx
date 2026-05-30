@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 
 import RootLayout from "../layouts/RootLayout";
 import DashboardLayout from "../layouts/DashboardLayout";
+import ExamLayout from "../layouts/ExamLayout"
 import RouteError from "../components/errors/RouteError";
 
 import Home from "../pages/Home";
@@ -12,6 +13,7 @@ import SessionLobby from "../pages/dashboard/SessionLobby";
 import CreateSession from "../pages/dashboard/CreateSession";
 import DashboardAnalytics from "../pages/dashboard/Analytics";
 import DashboardProfile from "../pages/dashboard/Profile";
+import ShowTheExam from "../pages/exam/ShowTheExam";
 
 export const router = createBrowserRouter([
   {
@@ -32,6 +34,17 @@ export const router = createBrowserRouter([
         element: <NotFound />,
       },
     ],
+  },
+  {
+    path: "room/:code/join",
+    element: <ExamLayout />,
+    errorElement: <RouteError />,
+    children: [
+      {
+        index: true,
+        element: <ShowTheExam />
+      }
+    ]
   },
   {
     path: "dashboard",

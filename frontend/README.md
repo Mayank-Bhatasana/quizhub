@@ -1,75 +1,88 @@
-# React + TypeScript + Vite
+# QuizWeb Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This app uses React + Vite + TanStack Query (React Query) for frontend data fetching.
+Backend endpoints live in `../backend` and are called through a small `apiFetch` helper.
 
-Currently, two official plugins are available:
+## How data flows
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1) UI calls a React Query hook (query or mutation)
+2) Hook executes a function from `src/services/`
+3) `apiFetch` builds the HTTP request and throws on errors
+4) React Query handles caching, loading, error state, and retries
 
-## React Compiler
+Key files:
+- `src/main.tsx` sets up `QueryClientProvider`
+- `src/query/queryClient.ts` configures global query defaults
+- `src/query/queryKeys.ts` stores consistent cache keys
+- `src/query/queries.ts` defines typed hooks used by pages
+- `src/services/api.ts` wraps `fetch` (base URL + error handling)
+- `src/services/quizApi.ts` is the backend API client
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+## React Query setup
 
-Note: This will impact Vite dev & build performances.
+`QueryClient` is created once and wrapped around the router in `src/main.tsx`:
 
-## Expanding the ESLint configuration
+```tsx
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./query/queryClient";
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+<QueryClientProvider client={queryClient}>
+  <RouterProvider router={router} />
+</QueryClientProvider>
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Global defaults are defined in `src/query/queryClient.ts`:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- `staleTime: 30_000` keeps query data fresh for 30s
+- `retry: 1` retries failed queries once
+- `refetchOnWindowFocus: false` avoids surprise refetches
+- `mutations.retry: 0` (fail fast on mutations)
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Query hooks
+
+All hooks are centralized in `src/query/queries.ts`.
+Use queries for GETs and mutations for POST/PUT/DELETE.
+
+Example query (greeting):
+
+```tsx
+const { data, isLoading, isError } = useGreeting();
+```
+
+Example mutation (create guest):
+
+```tsx
+const createGuest = useCreateGuest();
+const guest = await createGuest.mutateAsync("My Name");
+```
+
+## Pages using React Query
+
+- `src/pages/showGreeting.tsx`
+  - Uses `useGreeting()` for `/getGreet`
+- `src/pages/dashboard/CreateSession.tsx`
+  - Uses `useCreateGuest()`, `useCreateQuestion()`, `useCreateRoom()`
+  - Sequential mutations create a guest, then questions, then a room
+- `src/pages/dashboard/SessionLobby.tsx`
+  - Uses `useCreateGuest()` and `useJoinRoom()`
+  - Side effect to ensure guest exists and then join the room
+
+## Backend integration
+
+The frontend talks to the backend through `apiFetch`:
+
+```ts
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+```
+
+- Set `VITE_API_BASE_URL` in `.env` if your backend runs elsewhere.
+- Cookies are sent with `credentials: "include"` for guest sessions.
+- Errors from the backend are surfaced as `Error` and used by React Query.
+
+## Useful commands
+
+```bash
+pnpm dev
+pnpm build
+pnpm lint
 ```

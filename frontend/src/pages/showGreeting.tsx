@@ -1,20 +1,13 @@
-import { useEffect, useState } from "react";
-import { getGreet } from "../services/getGreet.ts";
+import { useGreeting } from "../query/queries";
 
 export function ShowGreet() {
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    async function fetchGreet() {
-      const data = await getGreet();
-      setMessage(data.message);
-    }
-
-    fetchGreet();
-  }, []);
+  const { data, isLoading, isError } = useGreeting();
+  const message = data?.message ?? "";
 
   return (
     <>
+      {isLoading ? <p>Loading...</p> : null}
+      {isError ? <p>Failed to load greeting.</p> : null}
       <h1>{message}</h1>
     </>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { createTempUser, getTempUser, setTempUser, updateTempUser } from "../../utils/tempUser";
-import { createGuest, joinRoom } from "../../services/quizApi";
+import { useCreateGuest, useGetAllParticipants, useJoinRoom, useRoomDetails, useStartRoom } from "../../query/queries";
 
 type LobbyParticipant = {
   id: string;
@@ -10,22 +10,28 @@ type LobbyParticipant = {
   avatarBg: string;
 };
 
+type LobbySocketEvent = {
+  type?: string;
+};
+
 function codeFromParam(input: string | undefined) {
   return (input ?? "").trim().replace(/\s+/g, "").toUpperCase();
 }
 
-function makeDemoParticipants(my: LobbyParticipant) {
-  const others: LobbyParticipant[] = [
-    { id: "p2", name: "Aarav", avatarEmoji: "⚡", avatarBg: "bg-amber-100" },
-    { id: "p3", name: "Sara", avatarEmoji: "🌟", avatarBg: "bg-rose-100" },
-    { id: "p4", name: "Kunal", avatarEmoji: "🎯", avatarBg: "bg-emerald-100" },
-  ];
-  return [my, ...others];
-}
-
 export default function SessionLobby() {
   const params = useParams();
+  const navigate = useNavigate();
   const code = codeFromParam(params.code);
+  const { mutateAsync: createGuestAsync, isPending: isCreatingGuest } = useCreateGuest();
+  const { mutateAsync: joinRoomAsync, isPending: isJoiningRoom } = useJoinRoom();
+  const { data: roomDetails } = useRoomDetails(code);
+  const { mutateAsync: startRoomAsync, isPending: isStartingRoom } = useStartRoom();
+  const {
+    data: allParticipants,
+    isLoading: isLoadingParticipants,
+    isFetching: isFetchingParticipants,
+    refetch: refetchParticipants,
+  } = useGetAllParticipants(code);
 
   const tempUser = getTempUser();
   const myParticipant: LobbyParticipant = useMemo(() => {
@@ -35,21 +41,59 @@ export default function SessionLobby() {
     return { id: tempUser?.id ?? "me", name, avatarEmoji, avatarBg };
   }, [tempUser]);
 
-  const [participants] = useState<LobbyParticipant[]>(
-    () => makeDemoParticipants(myParticipant),
-  );
   const [showEdit, setShowEdit] = useState(false);
   const [name, setName] = useState(myParticipant.name);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const remainingSeconds = 90;
+  const isConnecting = isCreatingGuest || isJoiningRoom;
+  const participantCount = allParticipants?.participants?.length ?? 0;
+  const tempProfileId = tempUser?.profileId;
+  const isHost = Boolean(tempProfileId && roomDetails?.room.hostId === tempProfileId);
+  const questionCount = roomDetails?.room.questionCount ?? 0;
+  const totalSeconds = questionCount * 20;
+
+  useEffect(() => {
+    if (!code) return;
+
+    const wsBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000")
+      .replace(/^http:/, "ws:")
+      .replace(/^https:/, "wss:");
+
+    const socket = new WebSocket(wsBaseUrl);
+
+    socket.onopen = () => {
+      socket.send(
+        JSON.stringify({
+          type: "subscribe",
+          code,
+        }),
+      );
+    };
+
+    socket.onmessage = (event) => {
+      let payload: LobbySocketEvent;
+      try {
+        payload = JSON.parse(event.data as string) as LobbySocketEvent;
+      } catch {
+        return;
+      }
+
+      if (payload.type === "room_started") {
+        navigate(`/room/${code}/join`, { replace: true });
+      }
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, [code, navigate]);
 
   function copyCode() {
     navigator.clipboard?.writeText(code);
   }
 
-  function saveName() {
+  async function saveName() {
     const next = name.trim().slice(0, 30);
     if (!next) return;
 
@@ -63,7 +107,25 @@ export default function SessionLobby() {
     } else {
       updateTempUser({ name: next });
     }
+
+
     setShowEdit(false);
+
+    if (!code || !tempProfileId) return;
+
+    try {
+      await joinRoomAsync({
+        code,
+        input: {
+          profileId: tempProfileId,
+          displayName: next,
+        },
+      });
+      refetchParticipants();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update name";
+      setError(message);
+    }
   }
 
   useEffect(() => {
@@ -82,13 +144,19 @@ export default function SessionLobby() {
       }
 
       try {
-        const guest = await createGuest(local.name);
+        const guest = await createGuestAsync({
+          displayName: local.name,
+          avatarUrl: local.avatarUrl ?? null,
+        });
         if (cancelled) return;
 
         const profileId = guest.profile.id;
-        const joined = await joinRoom(code, {
-          profileId,
-          displayName: local.name,
+        const joined = await joinRoomAsync({
+          code,
+          input: {
+            profileId,
+            displayName: local.name,
+          },
         });
         if (cancelled) return;
 
@@ -107,7 +175,28 @@ export default function SessionLobby() {
     return () => {
       cancelled = true;
     };
-  }, [code, name]);
+  }, [code, name, createGuestAsync, joinRoomAsync]);
+
+  async function handleStartQuiz() {
+    if (!code || !tempProfileId) return;
+    try {
+      await startRoomAsync({ code, profileId: tempProfileId });
+      refetchParticipants();
+      navigate(`/room/${code}/join`, { replace: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to start quiz";
+      setError(message);
+    }
+  }
+
+  // Refresh the list after two seconds
+  useEffect(() => {
+    if (!code) return;
+    const timer = window.setTimeout(() => {
+      refetchParticipants();
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [code, refetchParticipants]);
 
   if (!code) {
     return (
@@ -157,23 +246,22 @@ export default function SessionLobby() {
             </Link>
           </div>
         </div>
-
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-line bg-surface-soft p-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
               Joined
             </p>
             <p className="mt-2 text-2xl font-extrabold text-ink">
-              {participants.length}
+              {isLoadingParticipants ? "..." : participantCount}
             </p>
           </div>
           <div className="rounded-2xl border border-line bg-surface-soft p-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-              Time left (demo)
+              Total Time
             </p>
             <p className="mt-2 text-2xl font-extrabold text-ink">
-              {Math.floor(remainingSeconds / 60)}:
-              {String(remainingSeconds % 60).padStart(2, "0")}
+              {Math.floor(totalSeconds / 60)}:
+              {String(totalSeconds % 60).padStart(2, "0")}
             </p>
           </div>
           <div className="rounded-2xl border border-line bg-surface-soft p-5">
@@ -181,7 +269,7 @@ export default function SessionLobby() {
               Status
             </p>
             <p className="mt-2 text-2xl font-extrabold text-ink">
-              {status ?? "Waiting"}
+              {isConnecting ? "Connecting" : status ?? "Waiting"}
             </p>
           </div>
         </div>
@@ -195,34 +283,67 @@ export default function SessionLobby() {
               Showing demo list for now (real-time later).
             </p>
           </div>
-          <button
-            onClick={() => setShowEdit(true)}
-            className="inline-flex rounded-full border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-soft"
-          >
-            Change name
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => refetchParticipants()}
+              className="inline-flex rounded-full border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-soft"
+            >
+              {isFetchingParticipants ? "Refreshing..." : "Refresh"}
+            </button>
+            {isHost ? (
+              <button
+                onClick={handleStartQuiz}
+                disabled={isStartingRoom}
+                className="inline-flex rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-brand-300"
+              >
+                {isStartingRoom ? "Starting..." : "Start quiz"}
+              </button>
+            ) : null}
+            <button
+              onClick={() => setShowEdit(true)}
+              className="inline-flex rounded-full border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-soft"
+            >
+              Change name
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 text-xs font-semibold text-muted">
+          {questionCount ? `Quiz length: ${totalSeconds}s (${questionCount} questions)` : "Quiz length: TBD"}
         </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {participants.map((p) => (
-            <div
-              key={p.id}
-              className="flex items-center gap-4 rounded-2xl border border-line bg-white px-5 py-4"
-            >
+          {isFetchingParticipants ? (
+            <div className="text-sm font-semibold text-muted">Refreshing...</div>
+          ) : (
+            (allParticipants?.participants ?? []).map((p) => (
               <div
-                className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-ink ${p.avatarBg}`}
-                aria-hidden
+                key={p.id}
+                className="flex items-center gap-4 rounded-2xl border border-line bg-white px-5 py-4"
               >
-                {p.avatarEmoji}
+                {p.avatarUrl ? (
+                  <img
+                    src={p.avatarUrl}
+                    alt={p.displayName}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-sm font-bold text-ink"
+                    aria-hidden
+                  >
+                    {p.displayName.slice(0, 1).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-semibold text-ink">{p.displayName}</p>
+                  <p className="text-xs text-muted">
+                    {p.id === myParticipant.id ? "You" : "Participant"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold text-ink">{p.name}</p>
-                <p className="text-xs text-muted">
-                  {p.id === myParticipant.id ? "You" : "Participant"}
-                </p>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </section>
 
