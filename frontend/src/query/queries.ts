@@ -6,6 +6,7 @@ import {
   createRoom,
   getAuthMe,
   getAllTheParticipants,
+  getAnalytics,
   getQuestions,
   getRoomDetails,
   getScoreboard,
@@ -101,5 +102,14 @@ export function useScoreboard(roomId: string, enabled = true) {
     queryKey: queryKeys.roomScoreboard(roomId),
     queryFn: () => getScoreboard(roomId),
     enabled,
+  });
+}
+
+export function useAnalytics(profileId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.profileAnalytics(profileId ?? ""),
+    queryFn: () => getAnalytics(profileId!),
+    enabled: Boolean(profileId),
+    staleTime: 30_000,
   });
 }

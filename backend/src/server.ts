@@ -7,6 +7,7 @@ import openapi from "../openapi.json" with { type: "json" };
 
 import { subscribeToRoom, unsubscribeSocket } from "./sockets/roomSocket.js";
 import { getActiveRoom, saveAnswer, markRoomDirty } from "./services/room.service.js";
+import { prisma } from "./lib/prisma.js";
 import authRoutes from "./routes/auth.routes.js";
 import roomRoutes from "./routes/room.routes.js";
 
@@ -108,6 +109,36 @@ wss.on("connection", (ws) => {
 
     if (payload.type === "subscribe" && typeof payload.code === "string") {
       subscribeToRoom(payload.code, ws);
+
+      // Push current participant list to this subscriber immediately
+      try {
+        const room = await prisma.quizRoom.findUnique({
+          where: { code: payload.code.trim().toUpperCase() },
+        });
+        if (room) {
+          const participants = await prisma.roomParticipant.findMany({
+            where: { roomId: room.id },
+            orderBy: { joinedAt: "asc" },
+            include: { profile: { select: { avatarUrl: true } } },
+          });
+          if (ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify({
+              type: "participants_updated",
+              participants: participants.map((p) => ({
+                id: p.id,
+                profileId: p.profileId,
+                displayName: p.displayName,
+                isHost: p.isHost,
+                joinedAt: p.joinedAt,
+                avatarUrl: p.profile?.avatarUrl ?? null,
+              })),
+            }));
+          }
+        }
+      } catch (err) {
+        console.error("WS subscribe snapshot error:", err);
+      }
+
     } else if (payload.type === "submit_answer") {
       const {
         code,

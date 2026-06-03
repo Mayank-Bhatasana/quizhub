@@ -148,6 +148,24 @@ router.post("/rooms/:code/join", async (req, res) => {
       },
     });
 
+    // Broadcast updated participant list to all WS subscribers of this room
+    const allParticipants = await prisma.roomParticipant.findMany({
+      where: { roomId: room.id },
+      orderBy: { joinedAt: "asc" },
+      include: { profile: { select: { avatarUrl: true } } },
+    });
+    publishToRoom(room.code, {
+      type: "participants_updated",
+      participants: allParticipants.map((p) => ({
+        id: p.id,
+        profileId: p.profileId,
+        displayName: p.displayName,
+        isHost: p.isHost,
+        joinedAt: p.joinedAt,
+        avatarUrl: p.profile?.avatarUrl ?? null,
+      })),
+    });
+
     res.json({ roomId: room.id, participant });
   } catch (error: any) {
     res.status(500).json({ error: "Failed to join room" });
@@ -416,4 +434,147 @@ router.get("/rooms/:roomId/scoreboard", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/analytics/:profileId
+ * Returns aggregated quiz analytics for a given profile.
+ */
+router.get("/analytics/:profileId", async (req, res) => {
+  const { profileId } = req.params;
+
+  try {
+    // All participation records for this profile (excluding hosted rooms)
+    const participations = await prisma.roomParticipant.findMany({
+      where: { profileId, isHost: false },
+      include: {
+        room: {
+          select: {
+            id: true,
+            code: true,
+            status: true,
+            startedAt: true,
+            endedAt: true,
+          },
+        },
+        answers: {
+          include: {
+            roomQuestion: {
+              select: { points: true },
+            },
+          },
+        },
+      },
+      orderBy: { joinedAt: "desc" },
+    });
+
+    const totalSessions = participations.length;
+
+    let totalAnswered = 0;
+    let totalCorrect = 0;
+    let totalTimeSec = 0;
+    let totalScore = 0;
+    let bestScore = 0;
+
+    const recentSessions = await Promise.all(
+      participations.slice(0, 10).map(async (p) => {
+        const correct = p.answers.filter((a) => a.isCorrect).length;
+        const answered = p.answers.length;
+        const score = p.answers.reduce(
+          (sum, a) => sum + (a.isCorrect ? a.roomQuestion.points * 100 : 0),
+          0
+        );
+        const timeSec = p.answers.reduce(
+          (sum, a) => sum + (a.timeTakenSeconds ?? 0),
+          0
+        );
+
+        // Get total question count for this room
+        const totalQs = await prisma.roomQuestion.count({
+          where: { roomId: p.room.id },
+        });
+
+        // Get rank in this room
+        const scoreboard = await prisma.roomParticipant.findMany({
+          where: { roomId: p.room.id, isHost: false },
+          include: {
+            answers: {
+              include: { roomQuestion: { select: { points: true } } },
+            },
+          },
+        });
+
+        const scores = scoreboard
+          .map((sp) => ({
+            profileId: sp.profileId,
+            score: sp.answers.reduce(
+              (sum, a) => sum + (a.isCorrect ? a.roomQuestion.points * 100 : 0),
+              0
+            ),
+            time: sp.answers.reduce(
+              (sum, a) => sum + (a.timeTakenSeconds ?? 0),
+              0
+            ),
+          }))
+          .sort((a, b) => b.score - a.score || a.time - b.time);
+
+        const rank = scores.findIndex((s) => s.profileId === profileId) + 1;
+
+        return {
+          roomCode: p.room.code,
+          roomId: p.room.id,
+          status: p.room.status,
+          playedAt: p.room.startedAt ?? p.joinedAt,
+          correct,
+          total: totalQs,
+          answered,
+          score,
+          accuracy: totalQs > 0 ? Math.round((correct / totalQs) * 100) : 0,
+          timeSec,
+          rank,
+          totalParticipants: scoreboard.length,
+        };
+      })
+    );
+
+    // Aggregate all participations (not just recent 10)
+    for (const p of participations) {
+      const correct = p.answers.filter((a) => a.isCorrect).length;
+      const score = p.answers.reduce(
+        (sum, a) => sum + (a.isCorrect ? a.roomQuestion.points * 100 : 0),
+        0
+      );
+      const timeSec = p.answers.reduce(
+        (sum, a) => sum + (a.timeTakenSeconds ?? 0),
+        0
+      );
+      totalCorrect += correct;
+      totalAnswered += p.answers.length;
+      totalTimeSec += timeSec;
+      totalScore += score;
+      if (score > bestScore) bestScore = score;
+    }
+
+    const overallAccuracy =
+      totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 100) : 0;
+    const avgTimeSec =
+      totalAnswered > 0 ? Math.round(totalTimeSec / totalAnswered) : 0;
+
+    res.json({
+      analytics: {
+        totalSessions,
+        totalCorrect,
+        totalAnswered,
+        overallAccuracy,
+        bestScore,
+        totalScore,
+        avgTimeSec,
+        recentSessions,
+      },
+    });
+  } catch (error: any) {
+    console.error("Analytics fetch error:", error);
+    res.status(500).json({ error: "Failed to load analytics" });
+  }
+});
+
 export default router;
+

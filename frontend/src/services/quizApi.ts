@@ -195,6 +195,7 @@ export type LeaderboardEntry = {
   score: number;
   correct: number;
   total: number;
+  answered: number;
   timeSeconds: number;
 };
 
@@ -202,4 +203,34 @@ export async function getScoreboard(roomId: string) {
   return apiFetch<{
     scoreboard: LeaderboardEntry[];
   }>(`/api/rooms/${roomId}/scoreboard`);
+}
+
+export type RecentSession = {
+  roomCode: string;
+  roomId: string;
+  status: string;
+  playedAt: string;
+  correct: number;
+  total: number;
+  answered: number;
+  score: number;
+  accuracy: number;
+  timeSec: number;
+  rank: number;
+  totalParticipants: number;
+};
+
+export type AnalyticsData = {
+  totalSessions: number;
+  totalCorrect: number;
+  totalAnswered: number;
+  overallAccuracy: number;
+  bestScore: number;
+  totalScore: number;
+  avgTimeSec: number;
+  recentSessions: RecentSession[];
+};
+
+export async function getAnalytics(profileId: string) {
+  return apiFetch<{ analytics: AnalyticsData }>(`/api/analytics/${profileId}`);
 }

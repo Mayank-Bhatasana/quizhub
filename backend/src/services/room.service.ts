@@ -84,6 +84,7 @@ export async function computeLeaderboard(roomId: string) {
 
   const entries = participants.map((p) => {
     const correct = p.answers.filter((a) => a.isCorrect).length;
+    const answered = p.answers.length;
     const score = p.answers.reduce((sum, a) => sum + (a.isCorrect ? a.roomQuestion.points * 100 : 0), 0);
     const timeSeconds = p.answers.reduce((sum, a) => sum + (a.timeTakenSeconds ?? 0), 0);
     const avatarInfo = getAvatarForName(p.profileId, p.displayName);
@@ -96,6 +97,7 @@ export async function computeLeaderboard(roomId: string) {
       score,
       correct,
       total: totalQuestions,
+      answered,
       timeSeconds,
     };
   });
@@ -114,10 +116,14 @@ export const broadcastLeaderboard = async (roomCode: string) => {
 
     const scoreboard = await computeLeaderboard(room.id);
 
+    const allCompleted =
+      scoreboard.length > 0 && scoreboard.every((e) => e.answered >= e.total);
+
     publishToRoom(roomCode, {
       type: "leaderboard_updated",
       roomId: room.id,
       scoreboard,
+      allCompleted,
     });
   } catch (error) {
     console.error(`Error broadcasting leaderboard for room ${roomCode}:`, error);

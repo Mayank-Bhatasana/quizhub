@@ -86,6 +86,15 @@ function CrownIcon({ className = "h-5 w-5" }: { className?: string }) {
   );
 }
 
+/** Small checkmark icon for "completed" indicator */
+function CheckIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+      <path d="M2 5.5L4 7.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 type PodiumPlace = 1 | 2 | 3;
 
 const podiumConfig: Record<
@@ -158,16 +167,31 @@ function FlipShell({
   );
 }
 
+function CompletedBadge() {
+  return (
+    <span
+      title="Completed"
+      className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[0.6rem] font-bold text-emerald-700"
+    >
+      <CheckIcon />
+      Done
+    </span>
+  );
+}
+
 function PodiumSpot({
   place,
   entry,
   motion,
+  isEnded,
 }: {
   place: PodiumPlace;
   entry: LeaderboardEntry;
   motion?: MotionKind;
+  isEnded: boolean;
 }) {
   const config = podiumConfig[place];
+  const hasCompleted = entry.answered >= entry.total;
 
   return (
     <FlipShell id={entry.id} motion={motion} className={`flex flex-1 flex-col items-center ${config.order}`}>
@@ -195,7 +219,10 @@ function PodiumSpot({
         </span>
       </div>
 
-      <p className="mt-4 max-w-[7.5rem] truncate text-center text-sm font-bold text-ink">{entry.name}</p>
+      <p className="mt-4 max-w-[7.5rem] truncate text-center text-sm font-bold text-ink">
+        {entry.name}
+        {isEnded && hasCompleted && <CompletedBadge />}
+      </p>
       <p className="leaderboard-score mt-0.5 text-lg font-extrabold tracking-tight text-ink">
         {entry.score.toLocaleString()}
       </p>
@@ -216,11 +243,15 @@ function LeaderboardRow({
   entry,
   rank,
   motion,
+  isEnded,
 }: {
   entry: LeaderboardEntry;
   rank: number;
   motion?: MotionKind;
+  isEnded: boolean;
 }) {
+  const hasCompleted = entry.answered >= entry.total;
+
   return (
     <FlipShell id={entry.id} motion={motion}>
       <div className="flex items-center gap-3 rounded-2xl border border-line/80 bg-white px-4 py-3 shadow-sm sm:gap-4 sm:px-5">
@@ -236,7 +267,15 @@ function LeaderboardRow({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-ink">{entry.name}</p>
+          <p className="flex items-center truncate text-sm font-bold text-ink gap-1">
+            <span className="truncate">{entry.name}</span>
+            {isEnded && hasCompleted && <CompletedBadge />}
+            {isEnded && !hasCompleted && (
+              <span className="ml-1 inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[0.6rem] font-semibold text-amber-600 border border-amber-200">
+                In progress
+              </span>
+            )}
+          </p>
           <p className="text-xs text-muted">
             {entry.correct}/{entry.total} correct · {formatTime(entry.timeSeconds)}
           </p>
@@ -292,6 +331,7 @@ export default function ShowExamLeaderBoard() {
   const [motion, setMotion] = useState<Record<string, MotionKind>>({});
   const [banner, setBanner] = useState<TakeoverBanner | null>(null);
   const [bannerTick, setBannerTick] = useState(0);
+  const [allCompleted, setAllCompleted] = useState(false);
 
   const flipRootRef = useRef<HTMLDivElement>(null);
   const flipFirstRectsRef = useRef<Map<string, DOMRect>>(new Map());
@@ -299,6 +339,7 @@ export default function ShowExamLeaderBoard() {
 
   const { data: roomDetails } = useRoomDetails(roomCode);
   const roomId = roomDetails?.room?.id;
+  const isEnded = roomDetails?.room?.status === "ENDED";
   const { data: initialScoreboardData } = useScoreboard(roomId ?? "", Boolean(roomId));
 
   const [prevInitialData, setPrevInitialData] = useState<any>(null);
@@ -306,6 +347,11 @@ export default function ShowExamLeaderBoard() {
     setPrevInitialData(initialScoreboardData);
     if (initialScoreboardData?.scoreboard) {
       setPool(initialScoreboardData.scoreboard);
+      // Check initial completion state
+      const sc = initialScoreboardData.scoreboard as LeaderboardEntry[];
+      if (sc.length > 0 && sc.every((e) => e.answered >= e.total)) {
+        setAllCompleted(true);
+      }
     }
   }
 
@@ -317,6 +363,10 @@ export default function ShowExamLeaderBoard() {
   const first = topThree[0];
   const second = topThree[1];
   const third = topThree[2];
+
+  // How many participants are still pending
+  const pendingCount = pool.filter((e) => e.answered < e.total).length;
+  const completedCount = pool.filter((e) => e.answered >= e.total).length;
 
   useLayoutEffect(() => {
     if (skipFlipRef.current) {
@@ -374,6 +424,18 @@ export default function ShowExamLeaderBoard() {
         }
 
         setPool(nextScoreboard);
+
+        // Update allCompleted state from the broadcast
+        if (typeof payload.allCompleted === "boolean") {
+          setAllCompleted(payload.allCompleted);
+        } else {
+          const completed = nextScoreboard.length > 0 && nextScoreboard.every((e) => e.answered >= e.total);
+          setAllCompleted(completed);
+        }
+      }
+
+      if (payload.type === "room_ended") {
+        // Room ended — force a re-query; state will update via roomDetails refetch
       }
     };
 
@@ -385,39 +447,75 @@ export default function ShowExamLeaderBoard() {
   return (
     <div className="leaderboard-enter flex w-full flex-col gap-8 pb-6">
       <header className="text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          </span>
-          Live rankings
-        </div>
+        {/* Show "Live rankings" only while the test is still running */}
+        {!isEnded && (
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            Live rankings
+          </div>
+        )}
+
+        {/* Show "Test ended" badge when the room has ended */}
+        {isEnded && !allCompleted && (
+          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+            <span aria-hidden>🏁</span>
+            Test ended
+          </div>
+        )}
+
+        {/* Show "All done" celebration when everyone has completed */}
+        {allCompleted && (
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-4 py-1.5 text-xs font-bold text-emerald-800 shadow-sm">
+            <span aria-hidden>🎉</span>
+            Everyone has completed the test!
+          </div>
+        )}
 
         <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">Leaderboard</h1>
         <p className="mt-2 text-sm text-muted">
           Room <span className="font-bold text-ink">{roomCode}</span> · General Knowledge Quiz
         </p>
-        <p className="mt-1 text-xs text-muted">Top {MAX_VISIBLE} shown · scores update in real time</p>
+
+        {/* Completion progress indicator */}
+        {pool.length > 0 && !allCompleted && (
+          <p className="mt-1 text-xs text-muted">
+            <span className="font-semibold text-emerald-700">{completedCount}</span> of{" "}
+            <span className="font-semibold text-ink">{pool.length}</span> participants completed
+            {pendingCount > 0 && (
+              <span className="ml-1 text-amber-600 font-semibold">· {pendingCount} still in progress</span>
+            )}
+          </p>
+        )}
+
+        {!pool.length && (
+          <p className="mt-1 text-xs text-muted">Top {MAX_VISIBLE} shown · scores update in real time</p>
+        )}
       </header>
 
-      <div
-        role="status"
-        aria-live="polite"
-        className="leaderboard-takeover-banner mx-auto flex max-w-lg items-center justify-center gap-2 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800 shadow-sm"
-      >
-        <span className="text-base" aria-hidden>
-          ⚡
-        </span>
-        {banner ? (
-          <div key={bannerTick} className="leaderboard-banner-content flex min-w-0 items-center justify-center gap-2">
-            <span className="truncate">{banner.climber}</span>
-            <span className="shrink-0 text-brand-600">overtook</span>
-            <span className="truncate">{banner.target}</span>
-          </div>
-        ) : (
-          <span className="text-brand-700/80">Watching for rank changes…</span>
-        )}
-      </div>
+      {/* Rank-change banner — only shown while live */}
+      {!isEnded && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="leaderboard-takeover-banner mx-auto flex max-w-lg items-center justify-center gap-2 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-800 shadow-sm"
+        >
+          <span className="text-base" aria-hidden>
+            ⚡
+          </span>
+          {banner ? (
+            <div key={bannerTick} className="leaderboard-banner-content flex min-w-0 items-center justify-center gap-2">
+              <span className="truncate">{banner.climber}</span>
+              <span className="shrink-0 text-brand-600">overtook</span>
+              <span className="truncate">{banner.target}</span>
+            </div>
+          ) : (
+            <span className="text-brand-700/80">Watching for rank changes…</span>
+          )}
+        </div>
+      )}
 
       <div ref={flipRootRef} className="grid gap-8">
         {first ? (
@@ -426,9 +524,9 @@ export default function ShowExamLeaderBoard() {
             className="rounded-3xl border border-line/80 bg-white/90 p-5 shadow-sm backdrop-blur-sm sm:p-8"
           >
             <div className="flex items-end justify-center gap-3 sm:gap-6">
-              {second ? <PodiumSpot place={2} entry={second} motion={motion[second.id]} /> : null}
-              <PodiumSpot place={1} entry={first} motion={motion[first.id]} />
-              {third ? <PodiumSpot place={3} entry={third} motion={motion[third.id]} /> : null}
+              {second ? <PodiumSpot place={2} entry={second} motion={motion[second.id]} isEnded={isEnded} /> : null}
+              <PodiumSpot place={1} entry={first} motion={motion[first.id]} isEnded={isEnded} />
+              {third ? <PodiumSpot place={3} entry={third} motion={motion[third.id]} isEnded={isEnded} /> : null}
             </div>
           </section>
         ) : null}
@@ -445,7 +543,7 @@ export default function ShowExamLeaderBoard() {
             <ol className="grid gap-2.5">
               {rest.map((entry, index) => (
                 <li key={entry.id}>
-                  <LeaderboardRow entry={entry} rank={index + 4} motion={motion[entry.id]} />
+                  <LeaderboardRow entry={entry} rank={index + 4} motion={motion[entry.id]} isEnded={isEnded} />
                 </li>
               ))}
             </ol>
@@ -454,12 +552,7 @@ export default function ShowExamLeaderBoard() {
       </div>
 
       <footer className="flex flex-col items-center gap-3 border-t border-line pt-6 sm:flex-row sm:justify-center">
-        <Link
-          to={`/room/${roomCode}/join`}
-          className="inline-flex rounded-full border border-line bg-white px-6 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-soft"
-        >
-          Back to quiz
-        </Link>
+        {/* "Back to quiz" is intentionally removed */}
         <Link
           to="/dashboard"
           className="inline-flex rounded-full bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
