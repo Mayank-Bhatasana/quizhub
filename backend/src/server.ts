@@ -41,16 +41,19 @@ const allowedOrigins = new Set([
   // Production origins from env var (comma-separated)
   // e.g. ALLOWED_ORIGINS=https://yourapp.pages.dev,https://yourdomain.com
   ...(process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+    ? process.env.ALLOWED_ORIGINS.split(",")
+        .map((o) => o.trim().replace(/\/$/, ""))
+        .filter(Boolean)
     : []
   ),
 ]);
 
 const isAllowedOrigin = (origin?: string) => {
   if (!origin) return true;
-  if (allowedOrigins.has(origin)) return true;
+  const cleanOrigin = origin.trim().replace(/\/$/, "");
+  if (allowedOrigins.has(cleanOrigin)) return true;
   try {
-    const url = new URL(origin);
+    const url = new URL(cleanOrigin);
     const isLocalhost =
       url.hostname === "localhost" || url.hostname === "127.0.0.1";
     const isHttp =
