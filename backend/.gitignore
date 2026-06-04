@@ -6,4 +6,9 @@ node_modules
 
 /generated/prisma
 
-/generated/prisma
+# tsc build output
+/dist
+prisma.config.js
+prisma.config.js.map
+prisma.config.d.ts
+prisma.config.d.ts.map

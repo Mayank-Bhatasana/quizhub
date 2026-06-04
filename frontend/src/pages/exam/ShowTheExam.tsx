@@ -305,7 +305,6 @@ export default function ShowTheExam() {
     if (!Object.keys(storedAnswers).length) return;
 
     // Re-submit stored answers via REST to make sure they're in the DB
-    const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
     for (const question of questions) {
       const stored = storedAnswers[question.id];
       if (stored) {

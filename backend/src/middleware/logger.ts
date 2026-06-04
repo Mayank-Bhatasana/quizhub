@@ -45,6 +45,17 @@ export const requestLogger = (
     const ip = req.ip ?? req.socket?.remoteAddress ?? "?";
     const ts = new Date().toISOString();
 
+    // In production, skip noisy browser-generated noise:
+    //  - OPTIONS preflight requests (CORS handshake)
+    //  - /favicon.ico 404s (browser auto-request)
+    //  - 304 Not Modified (browser cache hit, no real work done)
+    const isProd = process.env.NODE_ENV === "production";
+    if (isProd) {
+      if (req.method === "OPTIONS") return;
+      if (req.path === "/favicon.ico" && res.statusCode === 404) return;
+      if (res.statusCode === 304) return;
+    }
+
     console.log(
       `\x1b[90m${ts}\x1b[0m ` +           // dim timestamp
       `\x1b[90m[${requestId}]\x1b[0m ` +   // dim request ID

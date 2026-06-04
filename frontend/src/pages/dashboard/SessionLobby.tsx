@@ -194,21 +194,19 @@ export default function SessionLobby() {
       }
 
       if (msg.type === "participants_updated") {
-        const incoming = msg.participants;
+        const incoming = (msg as { type: "participants_updated"; participants: WsParticipant[] }).participants;
 
         // Detect genuinely new IDs for the pop-in animation
-        setNewIds((prev) => {
-          const added = new Set<string>();
-          incoming.forEach((p) => {
-            if (!prevIdsRef.current.has(p.id)) added.add(p.id);
-          });
-          prevIdsRef.current = new Set(incoming.map((p) => p.id));
-          // Clear the new-ids after animation duration
-          if (added.size > 0) {
-            setTimeout(() => setNewIds(new Set()), 600);
-          }
-          return added;
+        const added = new Set<string>();
+        incoming.forEach((p: WsParticipant) => {
+          if (!prevIdsRef.current.has(p.id)) added.add(p.id);
         });
+        prevIdsRef.current = new Set(incoming.map((p: WsParticipant) => p.id));
+        setNewIds(added);
+        // Clear the new-ids after animation duration
+        if (added.size > 0) {
+          setTimeout(() => setNewIds(new Set()), 600);
+        }
 
         setParticipants(incoming);
       }

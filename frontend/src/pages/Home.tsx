@@ -1,25 +1,29 @@
 import { Link } from "react-router-dom";
+import liveImg from "../assets/liveImg.png";
+import shareImg from "../assets/shareImg.png";
+import leaderBoardImg from "../assets/leaderBoardImg.png";
+import analyticsImg from "../assets/analyticsImg.png";
 
 const productFeatures = [
   {
     title: "Live quizzes",
     desc: "Run timed or self-paced quizzes in sessions.",
-    img: "src/assets/liveImg.png",
+    img: liveImg,
   },
   {
     title: "Share a link",
     desc: "Participants join instantly—no app download.",
-    img: "src/assets/shareImg.png",
+    img: shareImg,
   },
   {
     title: "Leaderboards",
     desc: "See rankings and scores as answers come in.",
-    img: "src/assets/leaderBoardImg.png",
+    img: leaderBoardImg,
   },
   {
     title: "Analytics",
     desc: "Review performance and question insights.",
-    img: "src/assets/analyticsImg.png",
+    img: analyticsImg,
   },
 ];
 
