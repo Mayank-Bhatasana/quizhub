@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRoomDetails, useScoreboard } from "../../query/queries";
+import { queryKeys } from "../../query/queryKeys";
 import type { LeaderboardEntry } from "../../services/quizApi";
 
 type MotionKind = "overtook" | "overtaken";
@@ -321,6 +323,7 @@ function detectTakeover(prevList: LeaderboardEntry[], nextList: LeaderboardEntry
 export default function ShowExamLeaderBoard() {
   const params = useParams();
   const roomCode = codeFromParam(params.code);
+  const queryClient = useQueryClient();
 
   const [pool, setPool] = useState<LeaderboardEntry[]>([]);
   const poolRef = useRef<LeaderboardEntry[]>([]);
@@ -435,7 +438,8 @@ export default function ShowExamLeaderBoard() {
       }
 
       if (payload.type === "room_ended") {
-        // Room ended — force a re-query; state will update via roomDetails refetch
+        // Invalidate roomDetails so the Live rankings badge disappears immediately
+        queryClient.invalidateQueries({ queryKey: queryKeys.roomDetails(roomCode) });
       }
     };
 
