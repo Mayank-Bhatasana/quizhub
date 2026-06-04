@@ -40,7 +40,7 @@ const allowedOrigins = new Set([
   "http://127.0.0.1:4173",
   // Production origins from env var (comma-separated)
   // e.g. ALLOWED_ORIGINS=https://yourapp.pages.dev,https://yourdomain.com
-  ...( process.env.ALLOWED_ORIGINS
+  ...(process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
     : []
   ),
