@@ -11,3 +11,10 @@ node_modules
 dist
 dist-ssr
 *.local
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
