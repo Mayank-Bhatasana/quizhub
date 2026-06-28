@@ -141,9 +141,11 @@ export default function SessionLobby() {
 
   // WS-driven participant list
   const [participants, setParticipants] = useState<WsParticipant[]>([]);
-  // Track newly arrived IDs for the entry animation (cleared after 600ms)
+
+  //NOTE: Track newly arrived IDs for the entry animation (cleared after 600ms)
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const prevIdsRef = useRef<Set<string>>(new Set());
+  const socketRef = useRef<WebSocket | null>(null);
 
   const navigatedRef = useRef(false);
   const isConnecting = isCreatingGuest || isJoiningRoom;
@@ -193,6 +195,8 @@ export default function SessionLobby() {
       .replace(/^https:/, "wss:");
 
     const socket = new WebSocket(wsBase);
+    socketRef.current = socket;
+
     let alive = true;
 
     socket.onopen = () => {
@@ -234,6 +238,7 @@ export default function SessionLobby() {
 
     return () => {
       alive = false;
+      socketRef.current = null;
       socket.close();
     };
   }, [code, navigateAway]);
@@ -412,6 +417,12 @@ export default function SessionLobby() {
             </button>
             <Link
               to="/dashboard"
+              onClick={() => {
+                const ws = socketRef.current;
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: "unsubscribe", code, tempProfileId }));
+                }
+              }}
               className="rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
             >
               Leave
@@ -683,7 +694,7 @@ export default function SessionLobby() {
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Session Code</p>
                 <p className="text-4xl font-black tracking-widest text-brand-600 mt-1 select-all">{code}</p>
               </div>
-              
+
               <div className="border-t border-slate-200/60 pt-3 flex flex-col items-center">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted">Join Link</p>
                 <div className="mt-1 flex items-center gap-2 max-w-full">

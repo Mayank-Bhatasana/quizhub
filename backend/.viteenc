@@ -1,0 +1,4 @@
+ALLOWED_ORIGINS=https://quizhubs.pages.dev
+DATABASE_URL="postgresql://neondb_owner:npg_YrluytE7ep9M@ep-holy-lake-aoiqcg9p.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+JWT_SECRET=ee6bbe1108a424194b7acee59dcc726b154cce7f6c2a42dddc0a3449e7091ecb
+NODE_ENV=production

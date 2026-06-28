@@ -5,7 +5,7 @@ import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import openapi from "../openapi.json" with { type: "json" };
 
-import { subscribeToRoom, unsubscribeSocket } from "./sockets/roomSocket.js";
+import { subscribeToRoom, unsubscribeSocket, publishToRoom } from "./sockets/roomSocket.js";
 import { getActiveRoom, saveAnswer, markRoomDirty } from "./services/room.service.js";
 import { prisma } from "./lib/prisma.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -42,8 +42,8 @@ const allowedOrigins = new Set([
   // e.g. ALLOWED_ORIGINS=https://yourapp.pages.dev,https://yourdomain.com
   ...(process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(",")
-        .map((o) => o.trim().replace(/\/$/, ""))
-        .filter(Boolean)
+      .map((o) => o.trim().replace(/\/$/, ""))
+      .filter(Boolean)
     : []
   ),
 ]);
@@ -115,7 +115,6 @@ wss.on("connection", (ws) => {
     }
 
     if (!payload || typeof payload !== "object") return;
-
     if (payload.type === "subscribe" && typeof payload.code === "string") {
       subscribeToRoom(payload.code, ws);
 
@@ -148,6 +147,48 @@ wss.on("connection", (ws) => {
         console.error("WS subscribe snapshot error:", err);
       }
 
+    } else if (payload.type === "unsubscribe" && typeof payload.code === "string") {
+      // Remove this socket from the pub/sub map first so the broadcast below
+      // does not send to the departing client.
+      unsubscribeSocket(ws);
+      try {
+        const roomCode = payload.code.trim().toUpperCase();
+        const room = await prisma.quizRoom.findUnique({
+          where: { code: roomCode },
+        });
+        if (room) {
+          const participant = await prisma.roomParticipant.findFirst({
+            where: { profileId: payload.tempProfileId },
+          });
+
+          if (participant) {
+            await prisma.roomParticipant.delete({
+              where: { id: participant.id },
+            });
+          }
+
+          // Broadcast the updated participant list to all remaining subscribers.
+          const remaining = await prisma.roomParticipant.findMany({
+            where: { roomId: room.id },
+            orderBy: { joinedAt: "asc" },
+            include: { profile: { select: { avatarUrl: true } } },
+          });
+          publishToRoom(roomCode, {
+            type: "participants_updated",
+            participants: remaining.map((p) => ({
+              id: p.id,
+              profileId: p.profileId,
+              displayName: p.displayName,
+              isHost: p.isHost,
+              joinedAt: p.joinedAt,
+              avatarUrl: p.profile?.avatarUrl ?? null,
+            })),
+          });
+        }
+      } catch (err) {
+        console.error("WS unsubscribe error:", err);
+      }
+      ws.close();
     } else if (payload.type === "submit_answer") {
       const {
         code,
