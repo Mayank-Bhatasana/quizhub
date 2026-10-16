@@ -207,6 +207,20 @@ body {
   animation: quiz-option-wrong-flash 0.4s ease-in-out;
 }
 
+@keyframes quiz-option-wrong-flash-dark {
+  0%,
+  100% {
+    background-color: rgb(76 5 25 / 0.6);
+  }
+  50% {
+    background-color: rgb(76 5 25 / 0.9);
+  }
+}
+
+.dark .quiz-option-wrong {
+  animation: quiz-option-wrong-flash-dark 0.4s ease-in-out;
+}
+
 .quiz-check-pop {
   animation: quiz-check-pop 0.35s ease-out both;
 }
@@ -464,3 +478,23 @@ body {
 .animate-modal-scale-up {
   animation: modal-scale-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
+
+/* ── Inline code: override prism-tomorrow dark background ─────────────── */
+/* Standalone <code> that is NOT inside a <pre> should keep the inline style. */
+.markdown-body > code[class*="language-"],
+.markdown-body code:not(pre code) {
+  background-color: #f1f5f9 !important;
+  color: var(--color-brand-600) !important;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  border: 1px solid #e2e8f0;
+}
+
+.dark .markdown-body > code[class*="language-"],
+.dark .markdown-body code:not(pre code) {
+  background-color: #1e293b !important;
+  color: #93c5fd !important;
+  border-color: #334155;
+}
+

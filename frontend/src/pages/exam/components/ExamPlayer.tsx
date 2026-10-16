@@ -111,19 +111,19 @@ export function OptionList({
         const showWrong = isRevealed && isSelected && !isCorrect;
 
         let stateClasses =
-          "border-line bg-white hover:border-brand-300 hover:bg-brand-50/40 hover:shadow-sm";
+          "border-line bg-white dark:bg-slate-800 dark:border-slate-700 hover:border-brand-300 hover:bg-brand-50/40 dark:hover:bg-brand-900/40 hover:shadow-sm";
 
         if (isRevealed) {
           if (showCorrect) {
             stateClasses =
-              "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200 quiz-card-correct";
+              "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 dark:border-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-800 quiz-card-correct";
           } else if (showWrong) {
-            stateClasses = "border-rose-400 bg-rose-50 ring-2 ring-rose-200 quiz-card-wrong";
+            stateClasses = "border-rose-400 bg-rose-50 dark:bg-rose-950/60 dark:border-rose-500 ring-2 ring-rose-200 dark:ring-rose-800 quiz-card-wrong";
           } else {
             stateClasses = "border-line bg-surface-soft opacity-60";
           }
         } else if (isSelected) {
-          stateClasses = "border-brand-400 bg-brand-50 ring-2 ring-brand-100";
+          stateClasses = "border-brand-400 bg-brand-50 dark:bg-brand-900/50 dark:border-brand-500 ring-2 ring-brand-100 dark:ring-brand-800";
         }
 
         return (
@@ -185,7 +185,7 @@ export function OptionList({
         );
       })}
       {isRevealed && selectedIds.length === 0 ? (
-        <p className="mt-1 text-center text-xs font-semibold text-amber-700">
+        <p className="mt-1 text-center text-xs font-semibold text-amber-700 dark:text-amber-400">
           Time&apos;s up — the correct answer is highlighted.
         </p>
       ) : null}
@@ -197,7 +197,7 @@ export function ExplanationBlock({ explanation, visible }: { explanation?: strin
   if (!explanation || !visible) return null;
 
   return (
-    <div className="exam-explanation-in mt-6 rounded-2xl border border-brand-200 border-l-4 border-l-brand-500 bg-brand-50/70 px-5 py-4">
+    <div className="exam-explanation-in mt-6 rounded-2xl border border-brand-200 dark:border-brand-800 border-l-4 border-l-brand-500 bg-brand-50/70 dark:bg-brand-950/50 px-5 py-4">
       <div className="flex items-start gap-3">
         <span
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-base"
@@ -372,7 +372,7 @@ export default function ExamPlayer({
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 text-xs font-bold text-amber-800 dark:text-amber-300">
             <span aria-hidden>★</span>
             {question.points} pts
           </span>

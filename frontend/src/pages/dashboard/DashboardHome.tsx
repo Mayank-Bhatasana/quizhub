@@ -442,7 +442,7 @@ export default function DashboardHome() {
               type="button"
               onClick={handleCreateDemoRoom}
               disabled={isDemoCreating}
-              className="rounded-full bg-brand-100 hover:bg-brand-200 border border-brand-200 px-4 py-2 text-xs font-semibold text-brand-700 transition disabled:opacity-50"
+              className="rounded-full bg-brand-100 hover:bg-brand-200 border border-brand-200 dark:border-brand-800 dark:bg-brand-900/40 dark:text-brand-300 dark:hover:bg-brand-800/60 px-4 py-2 text-xs font-semibold text-brand-700 transition disabled:opacity-50"
             >
               {isDemoCreating ? "Creating Demo..." : "Create Demo Room (Fast Test)"}
             </button>
@@ -450,7 +450,7 @@ export default function DashboardHome() {
         </section>
 
       {/* ── QR Code Scanner Section ── */}
-      <section className="rounded-2xl border border-brand-200 bg-gradient-to-br from-indigo-50 via-brand-50 to-violet-50 p-7 shadow-sm md:p-8">
+      <section className="rounded-2xl border border-brand-200 dark:border-slate-800 bg-gradient-to-br from-indigo-50 via-brand-50 to-violet-50 dark:from-slate-900 dark:via-slate-900/90 dark:to-indigo-950/40 p-7 shadow-sm md:p-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-4">
             <div className="flex h-14 w-14 flex-none items-center justify-center rounded-2xl bg-brand-600 text-2xl shadow-md">
@@ -581,20 +581,20 @@ export default function DashboardHome() {
                 key={q.slug}
                 className="relative flex flex-col overflow-hidden rounded-2xl border border-line bg-white p-6 shadow-sm transition hover:border-brand-200 hover:shadow-md"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
+                <div className="flex flex-1 items-start justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
                     <span
                       className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-brand-50 text-2xl"
                       aria-hidden
                     >
                       {q.emoji ?? "🧩"}
                     </span>
-                    <div>
-                      <h3 className="font-bold text-ink">{q.title}</h3>
-                      <p className="mt-2 text-sm leading-relaxed text-muted">{q.description}</p>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-bold text-ink leading-snug">{q.title}</h3>
+                      <p className="mt-1.5 text-sm leading-relaxed text-muted">{q.description}</p>
                     </div>
                   </div>
-                  <span className="rounded-full border border-line bg-surface-soft px-3 py-1 text-xs font-semibold text-ink">
+                  <span className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-line bg-surface-soft px-2.5 py-1 text-xs font-semibold text-ink">
                     {q.questionCount} Q
                   </span>
                 </div>

@@ -252,7 +252,7 @@ export default function Practice() {
           >
             ← {quiz.emoji ?? ""} {quiz.title}
           </Link>
-          <p className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">
+          <p className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 px-3 py-1 text-xs font-bold text-amber-800 dark:text-amber-300">
             <span aria-hidden>★</span>
             {question.points} pts
           </p>

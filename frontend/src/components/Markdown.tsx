@@ -135,8 +135,12 @@ export default function Markdown({
     if (containerRef.current && prismLoaded) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const globalPrism = (window as any).Prism;
-      if (globalPrism && typeof globalPrism.highlightAllUnder === "function") {
-        globalPrism.highlightAllUnder(containerRef.current);
+      if (globalPrism && typeof globalPrism.highlightElement === "function") {
+        // Only highlight <code> elements inside <pre> blocks so inline code
+        // isn't swallowed by prism-tomorrow's dark background.
+        containerRef.current
+          .querySelectorAll("pre > code[class*='language-']")
+          .forEach((el) => globalPrism.highlightElement(el));
       }
     }
   }, [html, prismLoaded]);

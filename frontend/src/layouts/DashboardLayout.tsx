@@ -65,7 +65,7 @@ export default function DashboardLayout() {
               end
               className={({ isActive }) =>
                 `rounded-full px-4 py-2 text-sm font-semibold transition ${isActive
-                  ? "bg-brand-100 text-brand-700"
+                  ? "bg-brand-100 text-brand-700 dark:bg-brand-900/60 dark:text-brand-300"
                   : "text-muted hover:bg-surface-soft hover:text-ink"
                 }`
               }
@@ -76,7 +76,7 @@ export default function DashboardLayout() {
               to="/dashboard/analytics"
               className={({ isActive }) =>
                 `rounded-full px-4 py-2 text-sm font-semibold transition ${isActive
-                  ? "bg-brand-100 text-brand-700"
+                  ? "bg-brand-100 text-brand-700 dark:bg-brand-900/60 dark:text-brand-300"
                   : "text-muted hover:bg-surface-soft hover:text-ink"
                 }`
               }
@@ -87,7 +87,7 @@ export default function DashboardLayout() {
               to="/dashboard/questions"
               className={({ isActive }) =>
                 `rounded-full px-4 py-2 text-sm font-semibold transition ${isActive
-                  ? "bg-brand-100 text-brand-700"
+                  ? "bg-brand-100 text-brand-700 dark:bg-brand-900/60 dark:text-brand-300"
                   : "text-muted hover:bg-surface-soft hover:text-ink"
                 }`
               }
