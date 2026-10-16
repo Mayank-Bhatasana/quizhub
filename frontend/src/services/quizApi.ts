@@ -1,4 +1,4 @@
-import type { ExamQuestion } from "../types/exam";
+import type { ExamQuestion, QuestionType } from "../types/exam";
 import { apiFetch } from "./api";
 
 export type GuestProfile = {
@@ -106,15 +106,64 @@ export async function logoutUser() {
   });
 }
 
-export async function createQuestion(input: {
-  createdById: string;
+export type QuestionOptionInput = {
+  text: string;
+  isCorrect?: boolean;
+  sortOrder?: number;
+};
+
+export type QuestionInput = {
   text: string;
   explanation?: string;
-  options: { text: string; isCorrect?: boolean; sortOrder?: number }[];
-}) {
-  return apiFetch<{ question: unknown }>("/api/questions", {
+  type?: QuestionType;
+  options: QuestionOptionInput[];
+};
+
+export type BankOption = {
+  id: string;
+  questionId: string;
+  text: string;
+  isCorrect: boolean;
+  sortOrder: number;
+};
+
+export type BankQuestion = {
+  id: string;
+  createdById: string;
+  text: string;
+  explanation: string | null;
+  type: QuestionType;
+  isActive: boolean;
+  createdAt: string;
+  options: BankOption[];
+};
+
+export async function createQuestion(input: QuestionInput & { createdById: string }) {
+  return apiFetch<{ question: BankQuestion }>("/api/questions", {
     method: "POST",
     body: input,
+  });
+}
+
+export async function getQuestionBank(profileId: string) {
+  return apiFetch<{ questions: BankQuestion[] }>(
+    `/api/profiles/${profileId}/questions`,
+  );
+}
+
+export async function updateQuestion(
+  id: string,
+  input: Partial<QuestionInput>,
+) {
+  return apiFetch<{ question: BankQuestion }>(`/api/questions/${id}`, {
+    method: "PATCH",
+    body: input,
+  });
+}
+
+export async function deleteQuestion(id: string) {
+  return apiFetch<{ ok: boolean }>(`/api/questions/${id}`, {
+    method: "DELETE",
   });
 }
 
@@ -178,6 +227,7 @@ export async function submitAnswer(
     participantId: string;
     roomQuestionId: string;
     selectedOptionId?: string;
+    selectedOptionIds?: string[];
     timeTakenSeconds?: number;
   },
 ) {
@@ -185,6 +235,54 @@ export async function submitAnswer(
     method: "POST",
     body: input,
   });
+}
+
+export async function kickParticipant(
+  code: string,
+  input: { profileId: string; participantId: string },
+) {
+  return apiFetch<{ ok: boolean }>(`/api/rooms/${code}/kick`, {
+    method: "POST",
+    body: input,
+  });
+}
+
+export async function endRoom(code: string, input: { profileId: string }) {
+  return apiFetch<{ room: RoomDetails }>(`/api/rooms/${code}/end`, {
+    method: "POST",
+    body: input,
+  });
+}
+
+export type RoomQuestionStat = {
+  roomQuestionId: string;
+  index: number;
+  text: string;
+  type: QuestionType;
+  points: number;
+  answered: number;
+  correctCount: number;
+  accuracy: number;
+  avgTimeSeconds: number;
+  optionCounts: { id: string; text: string; isCorrect: boolean; count: number }[];
+};
+
+export type RoomAnalytics = {
+  roomCode: string;
+  status: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  totalParticipants: number;
+  completed: number;
+  avgScore: number;
+  topScore: number;
+  questionCount: number;
+  questionStats: RoomQuestionStat[];
+  scoreboard: LeaderboardEntry[];
+};
+
+export async function getRoomAnalytics(code: string) {
+  return apiFetch<{ analytics: RoomAnalytics }>(`/api/rooms/${code}/analytics`);
 }
 
 export type LeaderboardEntry = {
@@ -233,4 +331,35 @@ export type AnalyticsData = {
 
 export async function getAnalytics(profileId: string) {
   return apiFetch<{ analytics: AnalyticsData }>(`/api/analytics/${profileId}`);
+}
+
+export type CuratedQuizSummary = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  emoji: string | null;
+  questionCount: number;
+  totalPoints: number;
+};
+
+export type CuratedQuizDetail = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  emoji: string | null;
+  questions: ExamQuestion[];
+};
+
+/** Public list of the platform's curated "Quizzes by us". */
+export async function getCuratedQuizzes() {
+  return apiFetch<{ quizzes: CuratedQuizSummary[] }>("/api/curated-quizzes");
+}
+
+/** Full curated quiz (questions + answers) — requires authentication. */
+export async function getCuratedQuiz(slug: string) {
+  return apiFetch<{ quiz: CuratedQuizDetail }>(
+    `/api/curated-quizzes/${encodeURIComponent(slug)}`,
+  );
 }

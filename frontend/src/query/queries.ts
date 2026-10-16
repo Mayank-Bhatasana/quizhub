@@ -4,15 +4,23 @@ import {
   createGuest,
   createQuestion,
   createRoom,
+  deleteQuestion,
+  endRoom,
   getAuthMe,
   getAllTheParticipants,
   getAnalytics,
+  getCuratedQuiz,
+  getCuratedQuizzes,
+  getQuestionBank,
   getQuestions,
+  getRoomAnalytics,
   getRoomDetails,
   getScoreboard,
   joinRoom,
+  kickParticipant,
   logoutUser,
   startRoom,
+  updateQuestion,
 } from "../services/quizApi";
 import { queryKeys } from "./queryKeys";
 
@@ -111,5 +119,67 @@ export function useAnalytics(profileId: string | undefined) {
     queryFn: () => getAnalytics(profileId!),
     enabled: Boolean(profileId),
     staleTime: 30_000,
+  });
+}
+
+export function useQuestionBank(profileId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.questionBank(profileId ?? ""),
+    queryFn: () => getQuestionBank(profileId!),
+    enabled: Boolean(profileId),
+    staleTime: 30_000,
+  });
+}
+
+export function useUpdateQuestion() {
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Parameters<typeof updateQuestion>[1] }) =>
+      updateQuestion(id, input),
+  });
+}
+
+export function useDeleteQuestion() {
+  return useMutation({
+    mutationFn: (id: string) => deleteQuestion(id),
+  });
+}
+
+export function useKickParticipant() {
+  return useMutation({
+    mutationFn: ({ code, input }: { code: string; input: { profileId: string; participantId: string } }) =>
+      kickParticipant(code, input),
+  });
+}
+
+export function useEndRoom() {
+  return useMutation({
+    mutationFn: ({ code, profileId }: { code: string; profileId: string }) =>
+      endRoom(code, { profileId }),
+  });
+}
+
+export function useRoomAnalytics(code: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.roomAnalytics(code),
+    queryFn: () => getRoomAnalytics(code),
+    enabled: Boolean(code) && enabled,
+    staleTime: 15_000,
+  });
+}
+
+export function useCuratedQuizzes() {
+  return useQuery({
+    queryKey: queryKeys.curatedQuizzes,
+    queryFn: getCuratedQuizzes,
+    staleTime: 60_000,
+  });
+}
+
+export function useCuratedQuiz(slug: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.curatedQuiz(slug ?? ""),
+    queryFn: () => getCuratedQuiz(slug!),
+    enabled: Boolean(slug),
+    retry: 0,
   });
 }

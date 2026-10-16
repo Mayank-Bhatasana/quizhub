@@ -44,6 +44,11 @@
 - [Contributing](#-contributing)
 - [License](#-license)
 - [Author](#-author)
+- [Developer & AI Docs](skills/README.md)
+
+> 🤖 **Building on QuizHub (human or AI)?** Start with the project docs in
+> [`skills/`](skills/README.md) — architecture, the data/caching layer, backend
+> and frontend conventions, and local setup.
 
 ---
 
@@ -61,8 +66,16 @@ Under the hood it's a TypeScript monorepo: an **Express 5 + Prisma + PostgreSQL*
 - 📲 **Join via QR code** — every session gets a scannable QR code (plus a shareable room code), so players can hop in from their phones in seconds
 - 👤 **Guest mode** — play instantly as a temporary user, with a gentle prompt to create a full account afterward
 - 🏆 **Real-time leaderboard** — rankings update live as answers roll in
-- 📊 **Session analytics** — hosts get a post-session breakdown of performance
+- ❓ **Multiple question types** — single choice, multiple choice, and true/false
+- ⚡ **Speed-based scoring** — answer faster to earn more points (correct answers are worth 50–100% of the question's value)
+- 🗂️ **Question bank** — every question you create is saved and can be edited, deleted, and reused in future sessions
+- 🎛️ **Host controls** — remove players and end a session on the fly, broadcast to everyone instantly
+- 📊 **Session reports** — per-question difficulty, answer distribution, average response time, and a results summary for hosts
+- 🧩 **Curated practice quizzes** — the *Quizzes by us* library lets signed-in players practice hand-picked quizzes solo, with instant feedback and explanations
+- 🧑‍🎓 **Player analytics** — track your own scores, accuracy, and ranking over time
+- 📤 **CSV export** — download a session's results for spreadsheets or grading
 - 📝 **Markdown questions with syntax highlighting** — powered by PrismJS, ideal for programming quizzes with code snippets
+- 🌙 **Dark mode** — light and dark themes with OS preference detection
 - 🔐 **Authentication & protected routes** — dashboard pages are gated behind auth
 - 🛡️ **Hardened API** — rate limiting, security headers, request IDs, structured logging, and centralized error handling out of the box
 - 📚 **Self-documenting API** — OpenAPI spec served through Swagger UI
@@ -129,7 +142,7 @@ quizhub/
 │       ├── services/         # API clients
 │       └── types/            # Shared TypeScript types
 │
-└── skills/                   # Design guidelines
+└── skills/                   # AI/agent skills & project docs (see skills/README.md)
 ```
 
 ---
@@ -169,6 +182,7 @@ Run the database migrations and start the dev server:
 
 ```bash
 npx prisma migrate dev   # creates the schema
+npx prisma db seed       # loads the curated "Quizzes by us" content
 npm run dev              # starts the API with hot reload (tsx watch)
 ```
 
@@ -232,11 +246,13 @@ http://localhost:3000/docs/ui
 
 <!-- TODO: Edit to match your actual plans -->
 
-- [ ] More question types (true/false, multi-select, image-based)
-- [ ] Question bank import/export
+- [x] More question types (true/false, multi-select)
+- [x] Question bank (save, edit, and reuse questions)
+- [x] Dark mode
+- [ ] Image-based questions
+- [ ] Question bank import/export (CSV / JSON)
 - [ ] Automated test suite
 - [ ] Docker Compose for one-command local setup
-- [ ] Dark mode
 
 See the [open issues](https://github.com/mayank-bhatasana/quizhub/issues) for a full list of proposed features and known bugs.
 

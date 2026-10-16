@@ -1,33 +1,54 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useCreateGuest, useCreateQuestion, useCreateRoom } from "../../query/queries";
+import {
+  useCreateGuest,
+  useCreateQuestion,
+  useCreateRoom,
+  useQuestionBank,
+} from "../../query/queries";
 import { createTempUser, getTempUser, setTempUser, updateTempUser } from "../../utils/tempUser";
 import Markdown from "../../components/Markdown";
+import type { BankQuestion } from "../../services/quizApi";
+import type { QuestionType } from "../../types/exam";
 
 type QuestionDraft = {
   id: string;
   text: string;
   explanation: string;
+  type: QuestionType;
   points: number;
   options: { id: string; text: string; isCorrect: boolean }[];
+};
+
+const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
+  SINGLE: "Single choice",
+  MULTIPLE: "Multiple choice",
+  TRUE_FALSE: "True / False",
 };
 
 function makeId() {
   return Math.random().toString(16).slice(2) + Date.now().toString(16);
 }
 
-function createQuestionDraft(): QuestionDraft {
+function createQuestionDraft(type: QuestionType = "SINGLE"): QuestionDraft {
   return {
     id: makeId(),
     text: "",
     explanation: "",
+    type,
     points: 1,
-    options: [
-      { id: makeId(), text: "", isCorrect: true },
-      { id: makeId(), text: "", isCorrect: false },
-      { id: makeId(), text: "", isCorrect: false },
-      { id: makeId(), text: "", isCorrect: false },
-    ],
+    options:
+      type === "TRUE_FALSE"
+        ? [
+          { id: makeId(), text: "True", isCorrect: true },
+          { id: makeId(), text: "False", isCorrect: false },
+        ]
+        : [
+          { id: makeId(), text: "", isCorrect: true },
+          { id: makeId(), text: "", isCorrect: false },
+          { id: makeId(), text: "", isCorrect: false },
+          { id: makeId(), text: "", isCorrect: false },
+        ],
   };
 }
 
@@ -36,13 +57,20 @@ export default function CreateSession() {
   const createGuestMutation = useCreateGuest();
   const createQuestionMutation = useCreateQuestion();
   const createRoomMutation = useCreateRoom();
+  const bank = useQuestionBank(getTempUser()?.profileId);
   const [name, setName] = useState(() => getTempUser()?.name ?? "");
   const [questions, setQuestions] = useState<QuestionDraft[]>(() => [createQuestionDraft()]);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const hasValidQuestions = questions.every((q) =>
-    q.text.trim() && q.options.filter((o) => o.text.trim()).length >= 2 && q.options.some((o) => o.isCorrect),
-  );
+  const [showBank, setShowBank] = useState(false);
+
+  const hasValidQuestions = questions.every((q) => {
+    const filled = q.options.filter((o) => o.text.trim());
+    if (!q.text.trim() || filled.length < 2) return false;
+    if (q.type === "TRUE_FALSE" && filled.length !== 2) return false;
+    const correct = filled.filter((o) => o.isCorrect).length;
+    return q.type === "MULTIPLE" ? correct >= 1 : correct === 1;
+  });
 
   function updateQuestion(questionId: string, patch: Partial<QuestionDraft>) {
     setQuestions((prev) => prev.map((q) => (q.id === questionId ? { ...q, ...patch } : q)));
@@ -58,14 +86,67 @@ export default function CreateSession() {
     );
   }
 
-  function setCorrectOption(questionId: string, optionId: string) {
+  function selectCorrectOption(questionId: string, optionId: string) {
+    setQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id !== questionId) return q;
+        if (q.type === "MULTIPLE") {
+          return {
+            ...q,
+            options: q.options.map((o) =>
+              o.id === optionId ? { ...o, isCorrect: !o.isCorrect } : o,
+            ),
+          };
+        }
+        return {
+          ...q,
+          options: q.options.map((o) => ({ ...o, isCorrect: o.id === optionId })),
+        };
+      }),
+    );
+  }
+
+  function changeQuestionType(questionId: string, type: QuestionType) {
+    setQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id !== questionId) return q;
+        if (type === "TRUE_FALSE") {
+          return {
+            ...q,
+            type,
+            options: [
+              { id: makeId(), text: "True", isCorrect: true },
+              { id: makeId(), text: "False", isCorrect: false },
+            ],
+          };
+        }
+        const hasCorrect = q.options.some((o) => o.isCorrect);
+        return {
+          ...q,
+          type,
+          options: hasCorrect
+            ? q.options
+            : q.options.map((o, i) => ({ ...o, isCorrect: i === 0 })),
+        };
+      }),
+    );
+  }
+
+  function addOption(questionId: string) {
     setQuestions((prev) =>
       prev.map((q) =>
         q.id === questionId
-          ? {
-            ...q,
-            options: q.options.map((o) => ({ ...o, isCorrect: o.id === optionId })),
-          }
+          ? { ...q, options: [...q.options, { id: makeId(), text: "", isCorrect: false }] }
+          : q,
+      ),
+    );
+  }
+
+  function removeOption(questionId: string, optionId: string) {
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === questionId
+          ? { ...q, options: q.options.filter((o) => o.id !== optionId) }
           : q,
       ),
     );
@@ -77,6 +158,24 @@ export default function CreateSession() {
 
   function removeQuestion(questionId: string) {
     setQuestions((prev) => prev.filter((q) => q.id !== questionId));
+  }
+
+  function importFromBank(bankQuestion: BankQuestion) {
+    setQuestions((prev) => [
+      ...prev,
+      {
+        id: makeId(),
+        text: bankQuestion.text,
+        explanation: bankQuestion.explanation ?? "",
+        type: bankQuestion.type,
+        points: 1,
+        options: bankQuestion.options.map((option) => ({
+          id: makeId(),
+          text: option.text,
+          isCorrect: option.isCorrect,
+        })),
+      },
+    ]);
   }
 
   // Tab key indent handler for textareas and inputs (inserts 4 spaces)
@@ -161,6 +260,7 @@ export default function CreateSession() {
             createdById: hostProfileId,
             text: q.text.trim(),
             explanation: q.explanation.trim() || undefined,
+            type: q.type,
             options: trimmedOptions,
           });
 
@@ -220,14 +320,25 @@ export default function CreateSession() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-bold text-ink">Questions</h2>
-            <p className="mt-1 text-sm text-muted">At least 2 options per question, one correct.</p>
+            <p className="mt-1 text-sm text-muted">
+              Single choice, multiple choice, or true/false. At least 2 options per question.
+            </p>
           </div>
-          <button
-            onClick={addQuestion}
-            className="inline-flex rounded-full border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-soft"
-          >
-            Add question
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowBank(true)}
+              className="inline-flex rounded-full border border-brand-200 bg-brand-50 px-5 py-2.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+            >
+              Import from bank
+            </button>
+            <button
+              onClick={addQuestion}
+              className="inline-flex rounded-full border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-soft"
+            >
+              Add question
+            </button>
+          </div>
         </div>
 
         <div className="mt-6 grid gap-6">
@@ -246,6 +357,22 @@ export default function CreateSession() {
               </div>
 
               <div className="mt-4 grid gap-4">
+                <div className="flex flex-wrap gap-2">
+                  {(["SINGLE", "MULTIPLE", "TRUE_FALSE"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => changeQuestionType(q.id, t)}
+                      className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
+                        q.type === t
+                          ? "border-brand-300 bg-brand-600 text-white"
+                          : "border-line bg-white text-muted hover:bg-surface-soft"
+                      }`}
+                    >
+                      {QUESTION_TYPE_LABELS[t]}
+                    </button>
+                  ))}
+                </div>
                 <div>
                   <label className="text-xs font-semibold text-muted">Question text</label>
                   <textarea
@@ -305,7 +432,9 @@ export default function CreateSession() {
                 </div>
 
                 <div className="grid gap-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Options</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Options {q.type === "MULTIPLE" ? "· select all correct" : "· select the correct one"}
+                  </p>
                   {q.options.map((option, optionIndex) => (
                     <div
                       key={option.id}
@@ -313,21 +442,31 @@ export default function CreateSession() {
                     >
                       <label className="flex flex-wrap items-center gap-3 cursor-pointer">
                         <input
-                          type="radio"
+                          type={q.type === "MULTIPLE" ? "checkbox" : "radio"}
                           name={`correct-${q.id}`}
                           checked={option.isCorrect}
-                          onChange={() => setCorrectOption(q.id, option.id)}
+                          onChange={() => selectCorrectOption(q.id, option.id)}
                           className="cursor-pointer"
                         />
                         <span className="text-xs font-semibold text-muted">Option {optionIndex + 1}</span>
                         <textarea
                           value={option.text}
+                          disabled={q.type === "TRUE_FALSE"}
                           onChange={(e) => updateOption(q.id, option.id, { text: e.target.value })}
                           onKeyDown={(e) => handleOptionKeyDownIndent(e, q.id, option.id)}
                           placeholder="Answer option (Markdown supported)"
-                          className="min-w-[200px] flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-ink outline-none transition focus:border-brand-300 focus:ring-2 focus:ring-brand-100 resize-y"
+                          className="min-w-[200px] flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-ink outline-none transition focus:border-brand-300 focus:ring-2 focus:ring-brand-100 resize-y disabled:opacity-70"
                           rows={1}
                         />
+                        {q.type !== "TRUE_FALSE" && q.options.length > 2 ? (
+                          <button
+                            type="button"
+                            onClick={() => removeOption(q.id, option.id)}
+                            className="text-xs font-semibold text-rose-600 hover:text-rose-700"
+                          >
+                            Remove
+                          </button>
+                        ) : null}
                       </label>
                       {option.text.trim() && (/[*`_]/.test(option.text)) && (
                         <div className="pl-7 text-xs flex items-center gap-2 text-muted border-t border-slate-50 pt-2">
@@ -337,6 +476,15 @@ export default function CreateSession() {
                       )}
                     </div>
                   ))}
+                  {q.type !== "TRUE_FALSE" ? (
+                    <button
+                      type="button"
+                      onClick={() => addOption(q.id)}
+                      className="justify-self-start rounded-full border border-dashed border-line bg-white px-4 py-2 text-xs font-semibold text-muted transition hover:border-brand-300 hover:text-brand-700"
+                    >
+                      + Add option
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -353,6 +501,74 @@ export default function CreateSession() {
           </button>
         </div>
       </section>
+
+      {showBank ? (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+          onClick={() => setShowBank(false)}
+        >
+          <div
+            className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-line px-6 py-4">
+              <div>
+                <h3 className="text-lg font-bold text-ink">Question bank</h3>
+                <p className="text-xs text-muted">Add a saved question to this session.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBank(false)}
+                className="rounded-full p-2 text-muted transition hover:bg-surface-soft hover:text-ink"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid gap-3 overflow-y-auto p-6">
+              {bank.isLoading ? (
+                <p className="text-sm text-muted">Loading…</p>
+              ) : (bank.data?.questions ?? []).length === 0 ? (
+                <div className="rounded-xl border border-dashed border-line bg-surface-soft p-8 text-center">
+                  <p className="text-sm text-muted">
+                    No saved questions yet. Questions you create are saved to your bank
+                    automatically.
+                  </p>
+                </div>
+              ) : (
+                bank.data!.questions.map((bankQuestion) => (
+                  <div
+                    key={bankQuestion.id}
+                    className="flex items-start gap-3 rounded-xl border border-line bg-surface-soft p-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-700">
+                          {QUESTION_TYPE_LABELS[bankQuestion.type]}
+                        </span>
+                        <span className="text-xs text-muted">
+                          {bankQuestion.options.length} options
+                        </span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm font-semibold text-ink">
+                        {bankQuestion.text}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => importFromBank(bankQuestion)}
+                      className="flex-none rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      Add
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

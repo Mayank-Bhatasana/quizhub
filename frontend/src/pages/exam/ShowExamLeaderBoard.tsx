@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRoomDetails, useScoreboard } from "../../query/queries";
+import { useEndRoom, useRoomDetails, useScoreboard } from "../../query/queries";
 import { queryKeys } from "../../query/queryKeys";
 import type { LeaderboardEntry } from "../../services/quizApi";
+import { useTempUser } from "../../hooks/useTempUser";
+import { downloadCsv, scoreboardToCsv } from "../../utils/csv";
 
 type MotionKind = "overtook" | "overtaken";
 
@@ -345,6 +347,30 @@ export default function ShowExamLeaderBoard() {
   const isEnded = roomDetails?.room?.status === "ENDED";
   const { data: initialScoreboardData } = useScoreboard(roomId ?? "", Boolean(roomId));
 
+  const tempUser = useTempUser();
+  const tempProfileId = tempUser?.profileId;
+  const isHost = Boolean(tempProfileId && roomDetails?.room?.hostId === tempProfileId);
+  const { mutateAsync: endRoomAsync, isPending: isEnding } = useEndRoom();
+  const [endingError, setEndingError] = useState<string | null>(null);
+
+  async function handleEndQuiz() {
+    if (!tempProfileId || !roomCode) return;
+    if (!window.confirm("End this quiz for everyone? Players will see the final results.")) {
+      return;
+    }
+    setEndingError(null);
+    try {
+      await endRoomAsync({ code: roomCode, profileId: tempProfileId });
+      queryClient.invalidateQueries({ queryKey: queryKeys.roomDetails(roomCode) });
+    } catch (err) {
+      setEndingError(err instanceof Error ? err.message : "Failed to end quiz");
+    }
+  }
+
+  function handleDownloadCsv() {
+    downloadCsv(`quizhub-${roomCode}-results.csv`, scoreboardToCsv(roomCode, sortEntries(pool)));
+  }
+
   const [prevInitialData, setPrevInitialData] = useState<any>(null);
   if (initialScoreboardData !== prevInitialData) {
     setPrevInitialData(initialScoreboardData);
@@ -555,8 +581,37 @@ export default function ShowExamLeaderBoard() {
         ) : null}
       </div>
 
+      {endingError ? (
+        <p className="text-center text-sm font-semibold text-rose-500">{endingError}</p>
+      ) : null}
+
       <footer className="flex flex-col items-center gap-3 border-t border-line pt-6 sm:flex-row sm:justify-center">
-        {/* "Back to quiz" is intentionally removed */}
+        <button
+          type="button"
+          onClick={handleDownloadCsv}
+          disabled={pool.length === 0}
+          className="inline-flex rounded-full border border-line bg-white px-6 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-soft disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Download CSV
+        </button>
+        {isHost ? (
+          <button
+            type="button"
+            onClick={handleEndQuiz}
+            disabled={isEnding || isEnded}
+            className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-6 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isEnded ? "Quiz ended" : isEnding ? "Ending…" : "End quiz"}
+          </button>
+        ) : null}
+        {isHost ? (
+          <Link
+            to={`/dashboard/session/${roomCode}/report`}
+            className="inline-flex rounded-full border border-line bg-white px-6 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-soft"
+          >
+            Session report
+          </Link>
+        ) : null}
         <Link
           to="/dashboard"
           className="inline-flex rounded-full bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"

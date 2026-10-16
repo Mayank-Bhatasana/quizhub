@@ -195,6 +195,7 @@ wss.on("connection", (ws) => {
         participantId,
         roomQuestionId,
         selectedOptionId,
+        selectedOptionIds,
         timeTakenSeconds,
       } = payload;
 
@@ -209,6 +210,7 @@ wss.on("connection", (ws) => {
           participantId,
           roomQuestionId,
           selectedOptionId,
+          selectedOptionIds,
           timeTakenSeconds,
         });
 

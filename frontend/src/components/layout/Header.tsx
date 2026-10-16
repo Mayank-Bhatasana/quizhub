@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAuthMe, logoutUser } from "../../services/quizApi";
 import { queryKeys } from "../../query/queryKeys";
 import { clearTempUser } from "../../utils/tempUser";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Header() {
   const queryClient = useQueryClient();
@@ -33,14 +34,17 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-white">
       <div className="border-b border-line bg-surface-soft">
-        <div className="mx-auto flex h-10 max-w-6xl items-center justify-end gap-2 px-4 text-sm sm:px-6">
-          <span className="text-muted">Taking a quiz?</span>
-          <Link
-            to="/dashboard"
-            className="font-semibold text-brand-600 hover:text-brand-700"
-          >
-            Join as participant →
-          </Link>
+        <div className="mx-auto flex h-10 max-w-6xl items-center justify-between gap-2 px-4 text-sm sm:px-6">
+          <ThemeToggle className="h-7 w-7" />
+          <div className="flex items-center gap-2">
+            <span className="text-muted">Taking a quiz?</span>
+            <Link
+              to="/dashboard"
+              className="font-semibold text-brand-600 hover:text-brand-700"
+            >
+              Join as participant →
+            </Link>
+          </div>
         </div>
       </div>
 

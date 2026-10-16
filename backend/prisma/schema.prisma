@@ -19,6 +19,12 @@ enum RoomStatus {
   ENDED
 }
 
+enum QuestionType {
+  SINGLE
+  MULTIPLE
+  TRUE_FALSE
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -50,11 +56,13 @@ model Question {
   createdById String           @db.Uuid
   text        String
   explanation String?
+  type        QuestionType     @default(SINGLE)
   isActive    Boolean          @default(true)
   createdAt   DateTime         @default(now())
   createdBy   Profile          @relation(fields: [createdById], references: [id], onDelete: Restrict)
   options     QuestionOption[]
   roomItems   RoomQuestion[]
+  curatedItems CuratedQuizQuestion[]
 
   @@index([createdById])
   @@index([isActive])
@@ -127,6 +135,7 @@ model ParticipantAnswer {
   roomQuestionId  String         @db.Uuid
   participantId   String         @db.Uuid
   selectedOptionId String?       @db.Uuid
+  selectedOptionIds String[]     @default([]) @db.Uuid
   isCorrect       Boolean
   answeredAt      DateTime       @default(now())
   timeTakenSeconds Int?
@@ -138,4 +147,33 @@ model ParticipantAnswer {
   @@unique([roomQuestionId, participantId])
   @@index([roomId])
   @@index([participantId])
+}
+
+model CuratedQuiz {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique
+  title       String
+  description String
+  emoji       String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  questions   CuratedQuizQuestion[]
+
+  @@index([isActive])
+}
+
+model CuratedQuizQuestion {
+  id            String      @id @default(uuid()) @db.Uuid
+  curatedQuizId String      @db.Uuid
+  questionId    String      @db.Uuid
+  orderIndex    Int
+  points        Int         @default(1)
+  curatedQuiz   CuratedQuiz @relation(fields: [curatedQuizId], references: [id], onDelete: Cascade)
+  question      Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([curatedQuizId, orderIndex])
+  @@index([curatedQuizId])
+  @@index([questionId])
 }

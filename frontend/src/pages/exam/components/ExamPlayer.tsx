@@ -12,7 +12,11 @@ type ExamPlayerProps = {
   timeLeft: number;
   phase: QuestionPhase;
   selectedOptionId: string | null;
+  selectedOptionIds?: string[];
+  pendingSelection?: string[];
   onSelectOption: (optionId: string) => void;
+  onConfirmMultiple?: () => void;
+  canConfirmMultiple?: boolean;
   onPrev: () => void;
   onNext: () => void;
   canGoPrev: boolean;
@@ -78,24 +82,30 @@ function TimerRing({ timeLeft, phase }: { timeLeft: number; phase: QuestionPhase
   );
 }
 
-function OptionList({
+export function OptionList({
   question,
   phase,
-  selectedOptionId,
+  selectedIds,
+  isMultiple,
   onSelectOption,
 }: {
   question: ExamQuestion;
   phase: QuestionPhase;
-  selectedOptionId: string | null;
+  selectedIds: string[];
+  isMultiple: boolean;
   onSelectOption: (optionId: string) => void;
 }) {
   const isRevealed = phase === "revealed";
-  const correctOptionId = question.options.find((o) => o.isCorrect)?.id;
 
   return (
     <ul className="mt-8 grid gap-3">
+      {isMultiple && !isRevealed ? (
+        <li className="text-xs font-semibold uppercase tracking-wide text-brand-600">
+          Select all that apply
+        </li>
+      ) : null}
       {question.options.map((option, index) => {
-        const isSelected = selectedOptionId === option.id;
+        const isSelected = selectedIds.includes(option.id);
         const isCorrect = option.isCorrect;
         const showCorrect = isRevealed && isCorrect;
         const showWrong = isRevealed && isSelected && !isCorrect;
@@ -174,7 +184,7 @@ function OptionList({
           </li>
         );
       })}
-      {isRevealed && !selectedOptionId && correctOptionId ? (
+      {isRevealed && selectedIds.length === 0 ? (
         <p className="mt-1 text-center text-xs font-semibold text-amber-700">
           Time&apos;s up — the correct answer is highlighted.
         </p>
@@ -183,7 +193,7 @@ function OptionList({
   );
 }
 
-function ExplanationBlock({ explanation, visible }: { explanation?: string; visible: boolean }) {
+export function ExplanationBlock({ explanation, visible }: { explanation?: string; visible: boolean }) {
   if (!explanation || !visible) return null;
 
   return (
@@ -311,7 +321,11 @@ export default function ExamPlayer({
   timeLeft,
   phase,
   selectedOptionId,
+  selectedOptionIds,
+  pendingSelection,
   onSelectOption,
+  onConfirmMultiple,
+  canConfirmMultiple,
   onPrev,
   onNext,
   canGoPrev,
@@ -334,6 +348,20 @@ export default function ExamPlayer({
 
   const progressPercent = (questionNumber / totalQuestions) * 100;
   const isLastQuestion = questionNumber === totalQuestions;
+  const isMultiple = question.type === "MULTIPLE";
+
+  const selectedIds =
+    phase === "revealed"
+      ? selectedOptionIds?.length
+        ? selectedOptionIds
+        : selectedOptionId
+          ? [selectedOptionId]
+          : []
+      : isMultiple
+        ? (pendingSelection ?? [])
+        : selectedOptionId
+          ? [selectedOptionId]
+          : [];
 
   return (
     <div className="flex flex-1 flex-col">
@@ -375,9 +403,22 @@ export default function ExamPlayer({
         <OptionList
           question={question}
           phase={phase}
-          selectedOptionId={selectedOptionId}
+          selectedIds={selectedIds}
+          isMultiple={isMultiple}
           onSelectOption={onSelectOption}
         />
+
+        {isMultiple && phase === "answering" ? (
+          <button
+            type="button"
+            onClick={onConfirmMultiple}
+            disabled={!canConfirmMultiple}
+            className="w-full rounded-2xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-brand-300"
+          >
+            Lock in answer
+            {selectedIds.length > 0 ? ` (${selectedIds.length} selected)` : ""}
+          </button>
+        ) : null}
 
         <ExplanationBlock explanation={question.explanation} visible={phase === "revealed"} />
       </article>

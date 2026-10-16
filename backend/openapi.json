@@ -5,7 +5,9 @@
     "version": "1.0.0"
   },
   "servers": [
-    { "url": "http://localhost:3000" }
+    {
+      "url": "http://localhost:3000"
+    }
   ],
   "paths": {
     "/": {
@@ -19,7 +21,9 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "message": { "type": "string" }
+                    "message": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -38,9 +42,13 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "displayName": { "type": "string" }
+                  "displayName": {
+                    "type": "string"
+                  }
                 },
-                "required": ["displayName"]
+                "required": [
+                  "displayName"
+                ]
               }
             }
           }
@@ -56,7 +64,9 @@
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
         }
       }
     },
@@ -78,11 +88,15 @@
             "description": "Question created",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/QuestionResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/QuestionResponse"
+                }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
         }
       }
     },
@@ -93,7 +107,9 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateRoomRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoomRequest"
+              }
             }
           }
         },
@@ -102,11 +118,15 @@
             "description": "Room created",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/RoomResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponse"
+                }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
         }
       }
     },
@@ -118,14 +138,18 @@
             "name": "code",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/JoinRoomRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/JoinRoomRequest"
+              }
             }
           }
         },
@@ -134,12 +158,18 @@
             "description": "Joined",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/JoinRoomResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/JoinRoomResponse"
+                }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
         }
       }
     },
@@ -151,21 +181,28 @@
             "name": "code",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
-        
         "responses": {
           "200": {
             "description": "Joined",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/JoinRoomResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/JoinRoomResponse"
+                }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
         }
       }
     },
@@ -177,14 +214,18 @@
             "name": "roomId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/SubmitAnswerRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/SubmitAnswerRequest"
+              }
             }
           }
         },
@@ -193,12 +234,18 @@
             "description": "Answer saved",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/AnswerResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerResponse"
+                }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
         }
       }
     },
@@ -210,7 +257,9 @@
             "name": "roomId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -218,9 +267,158 @@
             "description": "Scores",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ScoreboardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreboardResponse"
+                }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/questions/{id}": {
+      "patch": {
+        "summary": "Update a saved question",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated question"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Soft-delete a saved question",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/api/profiles/{profileId}/questions": {
+      "get": {
+        "summary": "Get a profile's saved question bank",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Question bank"
+          }
+        }
+      }
+    },
+    "/api/rooms/{code}/kick": {
+      "post": {
+        "summary": "Remove a participant (host only)",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Participant removed"
+          },
+          "403": {
+            "description": "Not the host"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/rooms/{code}/end": {
+      "post": {
+        "summary": "End the quiz immediately (host only)",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quiz ended"
+          },
+          "403": {
+            "description": "Not the host"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/rooms/{code}/analytics": {
+      "get": {
+        "summary": "Session report: per-question breakdown and scores",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session analytics"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -233,9 +431,63 @@
             "description": "OpenAPI JSON",
             "content": {
               "application/json": {
-                "schema": { "type": "object" }
+                "schema": {
+                  "type": "object"
+                }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/curated-quizzes": {
+      "get": {
+        "summary": "List curated quizzes",
+        "description": "Public list of the platform's curated \"Quizzes by us\" (no answers).",
+        "responses": {
+          "200": {
+            "description": "Curated quizzes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuratedQuizListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/curated-quizzes/{slug}": {
+      "get": {
+        "summary": "Get curated quiz",
+        "description": "Full curated quiz with questions, options and answers. Requires an authenticated session.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Curated quiz",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuratedQuizResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -247,7 +499,9 @@
         "description": "Bad request",
         "content": {
           "application/json": {
-            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
           }
         }
       },
@@ -255,7 +509,9 @@
         "description": "Not found",
         "content": {
           "application/json": {
-            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
           }
         }
       }
@@ -264,7 +520,9 @@
       "ErrorResponse": {
         "type": "object",
         "properties": {
-          "error": { "type": "string" }
+          "error": {
+            "type": "string"
+          }
         }
       },
       "ProfileResponse": {
@@ -273,15 +531,36 @@
           "profile": {
             "type": "object",
             "properties": {
-              "id": { "type": "string" },
-              "username": { "type": "string", "nullable": true },
-              "avatarUrl": { "type": "string", "nullable": true },
-              "role": { "type": "string" },
-              "totalPoints": { "type": "integer" },
-              "isTemporary": { "type": "boolean" },
-              "guestToken": { "type": "string", "nullable": true },
-              "createdAt": { "type": "string" },
-              "updatedAt": { "type": "string" }
+              "id": {
+                "type": "string"
+              },
+              "username": {
+                "type": "string",
+                "nullable": true
+              },
+              "avatarUrl": {
+                "type": "string",
+                "nullable": true
+              },
+              "role": {
+                "type": "string"
+              },
+              "totalPoints": {
+                "type": "integer"
+              },
+              "isTemporary": {
+                "type": "boolean"
+              },
+              "guestToken": {
+                "type": "string",
+                "nullable": true
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
             }
           }
         }
@@ -289,84 +568,160 @@
       "CreateQuestionRequest": {
         "type": "object",
         "properties": {
-          "createdById": { "type": "string" },
-          "text": { "type": "string" },
-          "explanation": { "type": "string" },
+          "createdById": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "explanation": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SINGLE",
+              "MULTIPLE",
+              "TRUE_FALSE"
+            ],
+            "description": "Question type. Defaults to SINGLE."
+          },
           "options": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "text": { "type": "string" },
-                "isCorrect": { "type": "boolean" },
-                "sortOrder": { "type": "integer" }
+                "text": {
+                  "type": "string"
+                },
+                "isCorrect": {
+                  "type": "boolean"
+                },
+                "sortOrder": {
+                  "type": "integer"
+                }
               },
-              "required": ["text"]
+              "required": [
+                "text"
+              ]
             }
           }
         },
-        "required": ["createdById", "text", "options"]
+        "required": [
+          "createdById",
+          "text",
+          "options"
+        ]
       },
       "QuestionResponse": {
         "type": "object",
         "properties": {
-          "question": { "type": "object" }
+          "question": {
+            "type": "object"
+          }
         }
       },
       "CreateRoomRequest": {
         "type": "object",
         "properties": {
-          "hostProfileId": { "type": "string" },
+          "hostProfileId": {
+            "type": "string"
+          },
           "questions": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "questionId": { "type": "string" },
-                "points": { "type": "integer" },
-                "orderIndex": { "type": "integer" }
+                "questionId": {
+                  "type": "string"
+                },
+                "points": {
+                  "type": "integer"
+                },
+                "orderIndex": {
+                  "type": "integer"
+                }
               },
-              "required": ["questionId"]
+              "required": [
+                "questionId"
+              ]
             }
           }
         },
-        "required": ["hostProfileId", "questions"]
+        "required": [
+          "hostProfileId",
+          "questions"
+        ]
       },
       "RoomResponse": {
         "type": "object",
         "properties": {
-          "room": { "type": "object" }
+          "room": {
+            "type": "object"
+          }
         }
       },
       "JoinRoomRequest": {
         "type": "object",
         "properties": {
-          "profileId": { "type": "string" },
-          "displayName": { "type": "string" }
+          "profileId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
         },
-        "required": ["profileId", "displayName"]
+        "required": [
+          "profileId",
+          "displayName"
+        ]
       },
       "JoinRoomResponse": {
         "type": "object",
         "properties": {
-          "roomId": { "type": "string" },
-          "participant": { "type": "object" }
+          "roomId": {
+            "type": "string"
+          },
+          "participant": {
+            "type": "object"
+          }
         }
       },
       "SubmitAnswerRequest": {
         "type": "object",
         "properties": {
-          "participantId": { "type": "string" },
-          "roomQuestionId": { "type": "string" },
-          "selectedOptionId": { "type": "string" },
-          "timeTakenSeconds": { "type": "integer" }
+          "participantId": {
+            "type": "string"
+          },
+          "roomQuestionId": {
+            "type": "string"
+          },
+          "selectedOptionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "selectedOptionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "All selected option ids (for MULTIPLE questions)."
+          },
+          "timeTakenSeconds": {
+            "type": "integer"
+          }
         },
-        "required": ["participantId", "roomQuestionId"]
+        "required": [
+          "participantId",
+          "roomQuestionId"
+        ]
       },
       "AnswerResponse": {
         "type": "object",
         "properties": {
-          "answer": { "type": "object" }
+          "answer": {
+            "type": "object"
+          }
         }
       },
       "ScoreboardResponse": {
@@ -377,11 +732,62 @@
             "items": {
               "type": "object",
               "properties": {
-                "participantId": { "type": "string" },
-                "displayName": { "type": "string" },
-                "score": { "type": "integer" }
+                "participantId": {
+                  "type": "string"
+                },
+                "displayName": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "integer"
+                }
               }
             }
+          }
+        }
+      },
+      "CuratedQuizListResponse": {
+        "type": "object",
+        "properties": {
+          "quizzes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "emoji": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "questionCount": {
+                  "type": "integer"
+                },
+                "totalPoints": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CuratedQuizResponse": {
+        "type": "object",
+        "properties": {
+          "quiz": {
+            "type": "object"
           }
         }
       }

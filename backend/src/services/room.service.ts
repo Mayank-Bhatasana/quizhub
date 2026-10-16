@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { getAvatarForName } from "../utils/avatar.js";
+import { computeAnswerPoints } from "../utils/scoring.js";
 import { publishToRoom } from "../sockets/roomSocket.js";
 
 export async function saveAnswer({
@@ -7,12 +8,14 @@ export async function saveAnswer({
   participantId,
   roomQuestionId,
   selectedOptionId,
+  selectedOptionIds,
   timeTakenSeconds,
 }: {
   roomId: string;
   participantId: string;
   roomQuestionId: string;
   selectedOptionId?: string | null;
+  selectedOptionIds?: string[] | null;
   timeTakenSeconds?: number | null;
 }) {
   const roomQuestion = await prisma.roomQuestion.findUnique({
@@ -22,19 +25,46 @@ export async function saveAnswer({
     throw new Error("Room question not found");
   }
 
-  let isCorrect = false;
-  if (selectedOptionId) {
-    const option = await prisma.questionOption.findFirst({
-      where: {
-        id: selectedOptionId,
-        questionId: roomQuestion.questionId,
-      },
-    });
-    if (!option) {
+  // Normalise the submitted selection into a de-duplicated set of option ids.
+  // Multi-select questions arrive as `selectedOptionIds`, single-choice (and
+  // legacy clients) send a single `selectedOptionId`.
+  const submitted = new Set<string>();
+  if (Array.isArray(selectedOptionIds)) {
+    for (const id of selectedOptionIds) {
+      if (typeof id === "string" && id) submitted.add(id);
+    }
+  } else if (selectedOptionId) {
+    submitted.add(selectedOptionId);
+  }
+
+  const options = await prisma.questionOption.findMany({
+    where: { questionId: roomQuestion.questionId },
+    select: { id: true, isCorrect: true },
+  });
+  const optionIds = new Set(options.map((option) => option.id));
+  const correctIds = new Set(
+    options.filter((option) => option.isCorrect).map((option) => option.id),
+  );
+
+  // Reject any option that doesn't belong to this question.
+  for (const id of submitted) {
+    if (!optionIds.has(id)) {
       throw new Error("Invalid selected option");
     }
-    isCorrect = option.isCorrect;
   }
+
+  // A question is only correct when the player selected *exactly* the set of
+  // correct options — no missing picks and no extras.
+  const isCorrect =
+    submitted.size > 0 &&
+    submitted.size === correctIds.size &&
+    [...submitted].every((id) => correctIds.has(id));
+
+  const selectedList = [...submitted];
+  const normalisedTime =
+    typeof timeTakenSeconds === "number" && Number.isInteger(timeTakenSeconds)
+      ? timeTakenSeconds
+      : null;
 
   const answer = await prisma.participantAnswer.upsert({
     where: {
@@ -44,21 +74,19 @@ export async function saveAnswer({
       },
     },
     update: {
-      selectedOptionId: selectedOptionId ?? null,
+      selectedOptionId: selectedList[0] ?? null,
+      selectedOptionIds: selectedList,
       isCorrect,
-      timeTakenSeconds: typeof timeTakenSeconds === "number" && Number.isInteger(timeTakenSeconds)
-        ? timeTakenSeconds
-        : null,
+      timeTakenSeconds: normalisedTime,
     },
     create: {
       roomId,
       roomQuestionId,
       participantId,
-      selectedOptionId: selectedOptionId ?? null,
+      selectedOptionId: selectedList[0] ?? null,
+      selectedOptionIds: selectedList,
       isCorrect,
-      timeTakenSeconds: typeof timeTakenSeconds === "number" && Number.isInteger(timeTakenSeconds)
-        ? timeTakenSeconds
-        : null,
+      timeTakenSeconds: normalisedTime,
     },
   });
 
@@ -85,7 +113,10 @@ export async function computeLeaderboard(roomId: string) {
   const entries = participants.map((p) => {
     const correct = p.answers.filter((a) => a.isCorrect).length;
     const answered = p.answers.length;
-    const score = p.answers.reduce((sum, a) => sum + (a.isCorrect ? a.roomQuestion.points * 100 : 0), 0);
+    const score = p.answers.reduce(
+      (sum, a) => sum + computeAnswerPoints(a.roomQuestion.points, a.isCorrect, a.timeTakenSeconds),
+      0,
+    );
     const timeSeconds = p.answers.reduce((sum, a) => sum + (a.timeTakenSeconds ?? 0), 0);
     const avatarInfo = getAvatarForName(p.profileId, p.displayName);
 

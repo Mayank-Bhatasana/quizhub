@@ -4,6 +4,7 @@ export const dummyExamQuestions: ExamQuestion[] = [
   {
     id: "q1",
     text: "Which planet is known as the Red Planet?",
+    type: "SINGLE",
     points: 100,
     explanation:
       "Mars appears red because iron oxide (rust) on its surface reflects sunlight in the red spectrum.",
@@ -15,6 +16,7 @@ export const dummyExamQuestions: ExamQuestion[] = [
   {
     id: "q2",
     text: "What is the chemical symbol for gold?",
+    type: "SINGLE",
     points: 250,
     options: [
       { id: "q2-a", text: "Go", isCorrect: false },
@@ -26,6 +28,7 @@ export const dummyExamQuestions: ExamQuestion[] = [
   {
     id: "q3",
     text: "Which programming paradigm does React primarily use for building UI?",
+    type: "SINGLE",
     points: 150,
     explanation:
       "React uses a declarative, component-based model. You describe what the UI should look like for a given state, and React handles updating the DOM.",
@@ -38,6 +41,7 @@ export const dummyExamQuestions: ExamQuestion[] = [
   {
     id: "q4",
     text: "In which year did the first iPhone launch?",
+    type: "SINGLE",
     points: 500,
     explanation:
       "Apple announced the original iPhone on January 9, 2007, and it went on sale in the United States on June 29, 2007.",
@@ -51,6 +55,7 @@ export const dummyExamQuestions: ExamQuestion[] = [
   {
     id: "q5",
     text: "Is water composed of hydrogen and oxygen?",
+    type: "TRUE_FALSE",
     points: 200,
     options: [
       { id: "q5-a", text: "Yes", isCorrect: true },

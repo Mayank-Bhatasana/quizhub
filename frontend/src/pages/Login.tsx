@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { loginUser, registerUser } from "../services/quizApi";
 import { createTempUser, getTempUser, setTempUser } from "../utils/tempUser";
 
@@ -29,6 +29,8 @@ function FieldIcon({ children }: { children: React.ReactNode }) {
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = (location.state as { from?: string } | null)?.from ?? "/dashboard";
   const [mode, setMode] = useState<AuthMode>("login");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -93,7 +95,7 @@ export default function Login() {
       });
 
       setStatus(mode === "signup" ? "Account created. Redirecting..." : "Logged in. Redirecting...");
-      navigate("/dashboard", { replace: true });
+      navigate(redirectTo, { replace: true });
       setIsSubmitting(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Authentication failed";

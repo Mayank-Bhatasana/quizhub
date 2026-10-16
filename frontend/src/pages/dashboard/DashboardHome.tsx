@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { Html5Qrcode as Html5QrcodeType } from "html5-qrcode";
 import AccountPrompt from "../../components/dashboard/AccountPrompt";
 import { createTempUser, getTempUser, setTempUser, updateTempUser } from "../../utils/tempUser";
-import { useCreateGuest, useCreateQuestion, useCreateRoom } from "../../query/queries";
+import {
+  useAuthSession,
+  useCreateGuest,
+  useCreateQuestion,
+  useCreateRoom,
+  useCuratedQuizzes,
+} from "../../query/queries";
 
 // ── QR Scanner component (html5-qrcode, dynamically imported) ─────────────────
 const SCANNER_ID = "qr-scanner-element";
@@ -206,24 +212,6 @@ function QrScannerView({
   );
 }
 
-const featuredQuizzes = [
-  {
-    title: "General Knowledge (Quick)",
-    desc: "A short set of questions to warm up.",
-    locked: true,
-  },
-  {
-    title: "Tech Trivia",
-    desc: "Frontend, backend, and everything in between.",
-    locked: true,
-  },
-  {
-    title: "Sports & Movies",
-    desc: "Fun mix for casual sessions.",
-    locked: true,
-  },
-];
-
 function normalizeCode(input: string) {
   return input.trim().replace(/\s+/g, "").toUpperCase();
 }
@@ -243,6 +231,11 @@ export default function DashboardHome() {
   const createQuestionMutation = useCreateQuestion();
   const createRoomMutation = useCreateRoom();
   const [isDemoCreating, setIsDemoCreating] = useState(false);
+
+  const { data: authSession } = useAuthSession();
+  const isLoggedIn = Boolean(authSession?.user?.id);
+  const { data: curatedData, isLoading: curatedLoading } = useCuratedQuizzes();
+  const curatedQuizzes = curatedData?.quizzes ?? [];
 
   async function handleCreateDemoRoom() {
     setIsDemoCreating(true);
@@ -560,49 +553,76 @@ export default function DashboardHome() {
           <div>
             <h2 className="text-xl font-extrabold text-ink">Quizzes by us</h2>
             <p className="mt-2 text-sm text-muted">
-              These are curated quizzes. Log in to start them.
+              {isLoggedIn
+                ? "Curated quizzes from the QuizHub team — practice solo at your own pace."
+                : "These are curated quizzes. Log in to start them."}
             </p>
           </div>
-          <a
-            href="/login"
-            className="hidden rounded-full bg-white px-5 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-brand-50 md:inline-flex"
-          >
-            Log in to unlock
-          </a>
-        </div>
-
-        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {featuredQuizzes.map((q) => (
-            <article
-              key={q.title}
-              className="relative overflow-hidden rounded-2xl border border-line bg-white p-6 shadow-sm"
+          {!isLoggedIn ? (
+            <Link
+              to="/login"
+              className="hidden rounded-full bg-white px-5 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-brand-50 md:inline-flex"
             >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="font-bold text-ink">{q.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted">
-                    {q.desc}
-                  </p>
-                </div>
-                <span className="rounded-full border border-line bg-surface-soft px-3 py-1 text-xs font-semibold text-ink">
-                  Locked
-                </span>
-              </div>
-
-              <div className="mt-6 flex items-center justify-between">
-                <p className="text-xs text-muted">Requires login</p>
-                <a
-                  href="/login"
-                  className="inline-flex rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
-                >
-                  Login to start
-                </a>
-              </div>
-
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-brand-50 opacity-70" />
-            </article>
-          ))}
+              Log in to unlock
+            </Link>
+          ) : null}
         </div>
+
+        {curatedLoading ? (
+          <p className="mt-8 text-sm text-muted">Loading quizzes…</p>
+        ) : curatedQuizzes.length === 0 ? (
+          <p className="mt-8 text-sm text-muted">
+            No curated quizzes yet — check back soon.
+          </p>
+        ) : (
+          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {curatedQuizzes.map((q) => (
+              <article
+                key={q.slug}
+                className="relative flex flex-col overflow-hidden rounded-2xl border border-line bg-white p-6 shadow-sm transition hover:border-brand-200 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <span
+                      className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-brand-50 text-2xl"
+                      aria-hidden
+                    >
+                      {q.emoji ?? "🧩"}
+                    </span>
+                    <div>
+                      <h3 className="font-bold text-ink">{q.title}</h3>
+                      <p className="mt-2 text-sm leading-relaxed text-muted">{q.description}</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full border border-line bg-surface-soft px-3 py-1 text-xs font-semibold text-ink">
+                    {q.questionCount} Q
+                  </span>
+                </div>
+
+                <div className="mt-6 flex items-center justify-between gap-3">
+                  <p className="text-xs text-muted">{q.totalPoints} pts available</p>
+                  {isLoggedIn ? (
+                    <Link
+                      to={`/dashboard/practice/${q.slug}`}
+                      className="inline-flex rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      Practice
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/login"
+                      className="inline-flex rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      Login to start
+                    </Link>
+                  )}
+                </div>
+
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-brand-50 opacity-70" />
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <AccountPrompt />

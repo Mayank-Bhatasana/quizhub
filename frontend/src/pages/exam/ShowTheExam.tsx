@@ -2,10 +2,11 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ExamPlayer from "./components/ExamPlayer";
 import type { QuestionAnswer, QuestionPhase } from "../../types/exam";
-import { QUESTION_TIME_SECONDS } from "../../types/exam";
+import { QUESTION_TIME_SECONDS, isAnswerCorrect } from "../../types/exam";
 import { useGetAllParticipants, useGetQuestions, useRoomDetails } from "../../query/queries";
 import { getTempUser } from "../../utils/tempUser";
 import { submitAnswer } from "../../services/quizApi";
+import { computeAnswerPoints } from "../../utils/scoring";
 
 function codeFromParam(input: string | undefined) {
   return (input ?? "").trim().replace(/\s+/g, "").toUpperCase() || "DEMO";
@@ -59,8 +60,15 @@ export default function ShowTheExam() {
   const [answers, setAnswers] = useState<Record<string, QuestionAnswer>>(() => loadAnswersFromStorage(roomCode));
   const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_SECONDS);
   const [isCompleteState, setIsCompleteState] = useState(false);
+  const [pendingSelection, setPendingSelection] = useState<string[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const navigatedRef = useRef(false);
+
+  // Latest pending multi-select picks, readable from the timer callback.
+  const pendingSelectionRef = useRef<string[]>([]);
+  useEffect(() => {
+    pendingSelectionRef.current = pendingSelection;
+  }, [pendingSelection]);
 
   // Keep a ref to the latest answers so event handlers (beforeunload) can access them without stale closure
   const answersRef = useRef(answers);
@@ -138,11 +146,8 @@ export default function ShowTheExam() {
 
   const earnedPoints = questions.reduce((sum, question) => {
     const answer = answers[question.id];
-    if (!answer?.selectedOptionId) return sum;
-    const selected = question.options.find(
-      (o) => o.id === answer.selectedOptionId,
-    );
-    return selected?.isCorrect ? sum + question.points * 100 : sum;
+    if (!isAnswerCorrect(question, answer)) return sum;
+    return sum + computeAnswerPoints(question.points, true, answer?.timeTakenSeconds);
   }, 0);
 
   useEffect(() => {
@@ -172,7 +177,8 @@ export default function ShowTheExam() {
   }, [roomCode]);
 
   const submitAnswerToWs = useCallback(
-    (roomQuestionId: string, selectedOptionIdArg: string | null, elapsedSeconds: number) => {
+    (roomQuestionId: string, selectedIds: string[], elapsedSeconds: number) => {
+      const primary = selectedIds[0] ?? null;
       const socket = socketRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         console.warn("WebSocket not connected. Trying REST fallback.");
@@ -182,7 +188,8 @@ export default function ShowTheExam() {
           submitAnswer(rd.room.id, {
             participantId: mp.id,
             roomQuestionId,
-            selectedOptionId: selectedOptionIdArg ?? undefined,
+            selectedOptionId: primary ?? undefined,
+            selectedOptionIds: selectedIds,
             timeTakenSeconds: elapsedSeconds,
           }).catch(err => console.error("REST submitAnswer fallback error:", err));
         }
@@ -197,7 +204,8 @@ export default function ShowTheExam() {
             code: roomCode,
             participantId: mp.id,
             roomQuestionId,
-            selectedOptionId: selectedOptionIdArg,
+            selectedOptionId: primary,
+            selectedOptionIds: selectedIds,
             timeTakenSeconds: elapsedSeconds,
           })
         );
@@ -206,33 +214,58 @@ export default function ShowTheExam() {
     [roomCode]
   );
 
-  function revealQuestion(questionId: string, roomQuestionId: string, selectedOptionIdArg: string | null) {
+  function revealQuestion(questionId: string, roomQuestionId: string, selectedIds: string[]) {
     setAnswers((prev) => {
       if (prev[questionId]) return prev;
 
       const elapsedSeconds = QUESTION_TIME_SECONDS - timeLeft;
-      submitAnswerToWs(roomQuestionId, selectedOptionIdArg, elapsedSeconds);
+      submitAnswerToWs(roomQuestionId, selectedIds, elapsedSeconds);
 
       const next = {
         ...prev,
-        [questionId]: { selectedOptionId: selectedOptionIdArg, revealedAt: Date.now() },
+        [questionId]: {
+          selectedOptionId: selectedIds[0] ?? null,
+          selectedOptionIds: selectedIds,
+          timeTakenSeconds: elapsedSeconds,
+          revealedAt: Date.now(),
+        },
       };
 
       // Persist to localStorage after every answer
       saveAnswersToStorage(roomCode, next);
       return next;
     });
+    setPendingSelection([]);
   }
 
   function selectOption(optionId: string) {
     if (!currentQuestionId || !currentQuestion || answers[currentQuestionId]) return;
-    revealQuestion(currentQuestionId, currentQuestion.roomQuestionId || currentQuestion.id, optionId);
+
+    if (currentQuestion.type === "MULTIPLE") {
+      setPendingSelection((prev) =>
+        prev.includes(optionId) ? prev.filter((id) => id !== optionId) : [...prev, optionId],
+      );
+      return;
+    }
+
+    revealQuestion(currentQuestionId, currentQuestion.roomQuestionId || currentQuestion.id, [optionId]);
+  }
+
+  function confirmMultiple() {
+    if (!currentQuestionId || !currentQuestion || answers[currentQuestionId]) return;
+    if (pendingSelection.length === 0) return;
+    revealQuestion(
+      currentQuestionId,
+      currentQuestion.roomQuestionId || currentQuestion.id,
+      pendingSelection,
+    );
   }
 
   function goToQuestion(nextIndex: number) {
     const nextQuestion = questions[nextIndex];
     if (!nextQuestion) return;
 
+    setPendingSelection([]);
     setCurrentIndex(nextIndex);
     setTimeLeft(answers[nextQuestion.id] ? 0 : QUESTION_TIME_SECONDS);
   }
@@ -244,7 +277,13 @@ export default function ShowTheExam() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           if (currentQuestionId && currentQuestion) {
-            revealQuestion(currentQuestionId, currentQuestion.roomQuestionId || currentQuestion.id, null);
+            const autoSelected =
+              currentQuestion.type === "MULTIPLE" ? pendingSelectionRef.current : [];
+            revealQuestion(
+              currentQuestionId,
+              currentQuestion.roomQuestionId || currentQuestion.id,
+              autoSelected,
+            );
           }
           return 0;
         }
@@ -280,6 +319,7 @@ export default function ShowTheExam() {
             participantId: mp.id,
             roomQuestionId: question.roomQuestionId || question.id,
             selectedOptionId: null,
+            selectedOptionIds: [],
             timeTakenSeconds: QUESTION_TIME_SECONDS,
           });
 
@@ -312,9 +352,8 @@ export default function ShowTheExam() {
           participantId: myParticipant.id,
           roomQuestionId: question.roomQuestionId || question.id,
           selectedOptionId: stored.selectedOptionId ?? undefined,
-          timeTakenSeconds: stored.revealedAt
-            ? Math.round((stored.revealedAt - (stored.revealedAt - QUESTION_TIME_SECONDS * 1000)) / 1000)
-            : QUESTION_TIME_SECONDS,
+          selectedOptionIds: stored.selectedOptionIds ?? (stored.selectedOptionId ? [stored.selectedOptionId] : []),
+          timeTakenSeconds: stored.timeTakenSeconds ?? QUESTION_TIME_SECONDS,
         }).catch(() => {
           // silently ignore — answer may already exist (upsert)
         });
@@ -377,7 +416,11 @@ export default function ShowTheExam() {
       timeLeft={timeLeft}
       phase={phase}
       selectedOptionId={selectedOptionId}
+      selectedOptionIds={currentAnswer?.selectedOptionIds}
+      pendingSelection={pendingSelection}
       onSelectOption={selectOption}
+      onConfirmMultiple={confirmMultiple}
+      canConfirmMultiple={pendingSelection.length > 0}
       onPrev={goPrev}
       onNext={goNext}
       canGoPrev={currentIndex > 0 && !isComplete}

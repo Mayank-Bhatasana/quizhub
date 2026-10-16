@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 import { useEffect } from "react";
 import { useTempUser } from "../hooks/useTempUser";
 import { getTempUser, setTempUser, createTempUser } from "../utils/tempUser";
+import ThemeToggle from "../components/layout/ThemeToggle";
 
 function AvatarChip() {
   const user = useTempUser();
@@ -82,9 +83,21 @@ export default function DashboardLayout() {
             >
               Analytics
             </NavLink>
+            <NavLink
+              to="/dashboard/questions"
+              className={({ isActive }) =>
+                `rounded-full px-4 py-2 text-sm font-semibold transition ${isActive
+                  ? "bg-brand-100 text-brand-700"
+                  : "text-muted hover:bg-surface-soft hover:text-ink"
+                }`
+              }
+            >
+              Question bank
+            </NavLink>
           </div>
 
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Link
               to="/dashboard/create"
               className="hidden rounded-full border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface-soft sm:inline-flex"

@@ -5,7 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import logo from "../../assets/logo.svg";
 import { useTempUser } from "../../hooks/useTempUser";
 import { createTempUser, getTempUser, setTempUser, updateTempUser } from "../../utils/tempUser";
-import { useCreateGuest, useJoinRoom, useRoomDetails, useStartRoom } from "../../query/queries";
+import { useCreateGuest, useJoinRoom, useKickParticipant, useRoomDetails, useStartRoom } from "../../query/queries";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,10 +33,16 @@ function ParticipantCard({
   p,
   isMe,
   isNew,
+  canKick,
+  kicking,
+  onKick,
 }: {
   p: WsParticipant;
   isMe: boolean;
   isNew: boolean;
+  canKick?: boolean;
+  kicking?: boolean;
+  onKick?: () => void;
 }) {
   const initials = p.displayName.slice(0, 1).toUpperCase();
 
@@ -87,6 +93,17 @@ function ParticipantCard({
             YOU
           </span>
         )}
+        {canKick && onKick ? (
+          <button
+            type="button"
+            onClick={onKick}
+            disabled={kicking}
+            title="Remove participant"
+            className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600 transition hover:bg-rose-100 disabled:opacity-50"
+          >
+            {kicking ? "…" : "Remove"}
+          </button>
+        ) : null}
         {/* Live pulse dot */}
         <span className="relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -109,6 +126,7 @@ export default function SessionLobby() {
   const { mutateAsync: joinRoomAsync, isPending: isJoiningRoom } = useJoinRoom();
   const { data: roomDetails } = useRoomDetails(code);
   const { mutateAsync: startRoomAsync, isPending: isStartingRoom } = useStartRoom();
+  const { mutateAsync: kickAsync } = useKickParticipant();
 
   const tempUser = useTempUser();
   const myParticipant = {
@@ -126,6 +144,7 @@ export default function SessionLobby() {
   const [customDuration, setCustomDuration] = useState<number | null>(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [kickingId, setKickingId] = useState<string | null>(null);
 
   // ── Escape key listener for QR full screen modal ──────────────────────────
   useEffect(() => {
@@ -234,6 +253,13 @@ export default function SessionLobby() {
       if (msg.type === "room_started") {
         navigateAway();
       }
+
+      if (msg.type === "participant_kicked") {
+        const kicked = msg as { type: "participant_kicked"; profileId: string };
+        if (kicked.profileId === getTempUser()?.profileId) {
+          navigate("/dashboard", { replace: true });
+        }
+      }
     };
 
     return () => {
@@ -337,6 +363,24 @@ export default function SessionLobby() {
     }
   }
 
+  // ── Host: remove a participant ─────────────────────────────────────────────
+  async function handleKick(participant: WsParticipant) {
+    if (!tempProfileId || !code) return;
+    setKickingId(participant.id);
+    setError(null);
+    try {
+      await kickAsync({
+        code,
+        input: { profileId: tempProfileId, participantId: participant.id },
+      });
+      // The backend broadcasts a fresh participants_updated over WS.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove participant");
+    } finally {
+      setKickingId(null);
+    }
+  }
+
   function copyCode() {
     navigator.clipboard?.writeText(code);
   }
@@ -415,6 +459,14 @@ export default function SessionLobby() {
             >
               Copy Code
             </button>
+            {isHost ? (
+              <Link
+                to={`/dashboard/session/${code}/report`}
+                className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-surface-soft"
+              >
+                Report
+              </Link>
+            ) : null}
             <Link
               to="/dashboard"
               onClick={() => {
@@ -593,6 +645,9 @@ export default function SessionLobby() {
                 p={p}
                 isMe={p.profileId === tempProfileId}
                 isNew={newIds.has(p.id)}
+                canKick={isHost && !p.isHost && p.profileId !== tempProfileId}
+                kicking={kickingId === p.id}
+                onKick={() => handleKick(p)}
               />
             ))
           )}

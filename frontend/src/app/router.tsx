@@ -5,6 +5,7 @@ import RootLayout from "../layouts/RootLayout";
 import DashboardLayout from "../layouts/DashboardLayout";
 import ExamLayout from "../layouts/ExamLayout";
 import RouteError from "../components/errors/RouteError";
+import RequireAuth from "../components/auth/RequireAuth";
 
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
 // Each page becomes its own JS chunk, loaded only when that route is visited.
@@ -17,6 +18,9 @@ const SessionLobby = lazy(() => import("../pages/dashboard/SessionLobby"));
 const CreateSession = lazy(() => import("../pages/dashboard/CreateSession"));
 const DashboardAnalytics = lazy(() => import("../pages/dashboard/Analytics"));
 const DashboardProfile = lazy(() => import("../pages/dashboard/Profile"));
+const QuestionBank = lazy(() => import("../pages/dashboard/QuestionBank"));
+const SessionReport = lazy(() => import("../pages/dashboard/SessionReport"));
+const Practice = lazy(() => import("../pages/dashboard/Practice"));
 const ShowTheExam = lazy(() => import("../pages/exam/ShowTheExam"));
 const ShowExamLeaderBoard = lazy(() => import("../pages/exam/ShowExamLeaderBoard"));
 
@@ -87,6 +91,23 @@ export const router = createBrowserRouter([
       {
         path: "session/:code",
         element: <S><SessionLobby /></S>,
+      },
+      {
+        path: "session/:code/report",
+        element: <S><SessionReport /></S>,
+      },
+      {
+        path: "questions",
+        element: <S><QuestionBank /></S>,
+      },
+      {
+        element: <RequireAuth />,
+        children: [
+          {
+            path: "practice/:slug",
+            element: <S><Practice /></S>,
+          },
+        ],
       },
       {
         path: "analytics",
